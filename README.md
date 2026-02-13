@@ -93,41 +93,24 @@ https://site-crawler-909296093050.europe-west2.run.app/
 
 ## Architecture diagram
 
-┌────────────────────┐
-│ Browser UI │
-│ React + Vite SPA │
-└─────────┬──────────┘
-│
-│ GET /api/config
-│ POST /api/auth (optional pin)
-│ POST /api/crawl
-│
-┌─────────▼──────────┐
-│ Express Server │
-│ Node.js Backend │
-└─────────┬──────────┘
-│
-│ Fetch robots.txt
-│ Fetch sitemap.xml
-│ Fetch HTML pages
-│
-┌─────────▼──────────┐
-│ Crawl Engine │
-│─────────────────── │
-│ • URL normalisation│
-│ • Scope filtering │
-│ • Exclude paths │
-│ • Path limits │
-│ • Job page ignore │
-│ • Concurrency pool │
-└─────────┬──────────┘
-│
-│ HTTP requests
-│
-┌─────────▼──────────┐
-│ Target Website │
-│ (same host only) │
-└────────────────────┘
+```mermaid
+flowchart TD
+  Bookmarklet["Bookmarklet (optional)"] --> UI["Browser UI<br/>React + Vite SPA"]
+  UI -->|GET /api/config| API["Express API<br/>Node.js backend"]
+  UI -->|POST /api/auth (optional pin)| API
+  UI -->|POST /api/crawl| API
+
+  API --> Crawler["Crawl engine<br/>queue + filters + limits"]
+  Crawler -->|fetch robots.txt| Robots["robots.txt"]
+  Crawler -->|fetch sitemap.xml| Sitemap["sitemap.xml"]
+  Crawler -->|fetch HTML pages| Site["Target website (same host)"]
+
+  Robots --> Crawler
+  Sitemap --> Crawler
+  Site --> Crawler
+  Crawler --> API
+  API --> UI
+```
 
 
 ---
