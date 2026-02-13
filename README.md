@@ -95,15 +95,13 @@ https://site-crawler-909296093050.europe-west2.run.app/
 
 ```mermaid
 flowchart TD
-  Bookmarklet["Bookmarklet (optional)"] --> UI["Browser UI (React + Vite SPA)"]
-  UI -->|"GET /api/config"| API["Express API (Node.js backend)"]
-  UI -->|"POST /api/auth (optional pin)"| API
-  UI -->|"POST /api/crawl"| API
+  Bookmarklet["Bookmarklet optional"] --> UI["Browser UI (React + Vite SPA)"]
+  UI --> API["Express API (Node.js backend)"]
 
-  API --> Crawler["Crawl engine (queue + filters + limits)"]
-  Crawler -->|fetch robots.txt| Robots["robots.txt"]
-  Crawler -->|fetch sitemap.xml| Sitemap["sitemap.xml"]
-  Crawler -->|fetch HTML pages| Site["Target website (same host)"]
+  API --> Crawler["Crawl engine"]
+  Crawler --> Robots["robots.txt"]
+  Crawler --> Sitemap["sitemap.xml"]
+  Crawler --> Site["Target website"]
 
   Robots --> Crawler
   Sitemap --> Crawler
