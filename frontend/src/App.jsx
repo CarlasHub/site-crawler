@@ -98,6 +98,7 @@ export default function App() {
   const [presets, setPresets] = useState([]);
   const [presetName, setPresetName] = useState("default");
   const fileInputRef = useRef(null);
+  const [isBookmarklet, setIsBookmarklet] = useState(false);
 
   useEffect(() => {
     const stored = safeJsonParse(localStorage.getItem(STORAGE_KEY), []);
@@ -114,6 +115,22 @@ export default function App() {
       setIgnoreJobPages(last.ignoreJobPages !== false);
       setBrokenLinkCheck(!!last.brokenLinkCheck);
       setPresetName(last.presetName || "default");
+    }
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search || "");
+    const mode = String(params.get("mode") || "").toLowerCase();
+    const flag = String(params.get("bookmarklet") || "").toLowerCase();
+    const targetUrl = params.get("url");
+
+    const inBookmarklet = mode === "bookmarklet" || flag === "1" || flag === "true";
+    if (inBookmarklet) {
+      setIsBookmarklet(true);
+    }
+
+    if (targetUrl) {
+      setUrl(targetUrl);
     }
   }, []);
 
@@ -488,8 +505,13 @@ export default function App() {
     };
   }, [data, urls]);
 
+  const brandName = isBookmarklet ? "A11y Cat" : "Carla’s tools";
+  const brandTag = isBookmarklet
+    ? "A11y Cat - Site Crawler for the page you are on."
+    : "Site Crawler - Discover internal URLs with exclusions, redirects, duplicates and presets.";
+
   return (
-    <div className="shell">
+    <div className={`shell${isBookmarklet ? " shell--bookmarklet" : ""}`}>
       <a className="skip" href="#main">Skip to content</a>
 
       <header className="header">
@@ -497,8 +519,8 @@ export default function App() {
           <div className="brand">
             <div className="brandMark" aria-hidden="true" />
             <div className="brandText">
-              <div className="brandName">Carla’s tools</div>
-              <div className="brandTag">Site Crawler - Discover internal URLs with exclusions, redirects, duplicates and presets.</div>
+              <div className="brandName">{brandName}</div>
+              <div className="brandTag">{brandTag}</div>
             </div>
           </div>
 

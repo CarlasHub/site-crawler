@@ -975,9 +975,28 @@
      border: 0;
    }
    
-   .file { 
-     display: none; 
-   }
+  .file { 
+    display: none; 
+  }
+
+  /* === BOOKMARKLET MODE === */
+  .shell--bookmarklet .hero,
+  .shell--bookmarklet .footer,
+  .shell--bookmarklet .nav {
+    display: none;
+  }
+
+  .shell--bookmarklet .main {
+    padding-top: 88px;
+  }
+
+  .shell--bookmarklet .headerInner {
+    grid-template-columns: auto 1fr;
+  }
+
+  .shell--bookmarklet .brandTag {
+    max-width: 52ch;
+  }
    
    /* === FOOTER === */
    .footer {

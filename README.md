@@ -20,6 +20,7 @@
 - Configuration and environment variables
 - Deploy to Google Cloud Run
 - Performance and roadmap
+- Bookmarklet (A11y Cat)
 
 ---
 
@@ -181,3 +182,14 @@ Request body:
     "brokenLinkCheck": false
   }
 }
+```
+
+---
+
+## Bookmarklet (A11y Cat)
+
+Use the crawler on the page you are currently visiting.
+
+1. Open `docs/bookmarklet.js` and set `APP_ORIGIN` to your deployed app URL.
+2. Create a new browser bookmark and paste the file contents as the URL (prefix with `javascript:`).
+3. Click the bookmark on any site to open **A11y Cat**. It auto-fills the current page URL.

@@ -75,6 +75,15 @@ function normalizePathForRules(pathname) {
   return "/" + parts.join("/");
 }
 
+function parseUrlParts(urlString) {
+  try {
+    const u = new URL(urlString);
+    return { host: u.host, pathname: String(u.pathname || "/") };
+  } catch {
+    return null;
+  }
+}
+
 function sanitizePathLimits(pathLimits) {
   const inList = Array.isArray(pathLimits) ? pathLimits : [];
   const cleaned = inList
@@ -149,41 +158,54 @@ function hasExcludedExtension(urlString, options) {
   return options.excludeExtensions.some((ext) => lower.endsWith(ext));
 }
 
-function isExcludedByPath(urlString, excludedPaths = []) {
-  if (!excludedPaths || excludedPaths.length === 0) return false;
+function buildExcludeMatchers(excludedPaths = []) {
+  const matchers = [];
+  if (!excludedPaths || excludedPaths.length === 0) return matchers;
 
-  const pathname = new URL(urlString).pathname.toLowerCase();
-
-  return excludedPaths.some((p) => {
+  for (const p of excludedPaths) {
     const clean = String(p || "").trim().toLowerCase();
-    if (!clean) return false;
-    if (!clean.startsWith("/")) return false;
+    if (!clean) continue;
+    if (!clean.startsWith("/")) continue;
 
-    if (clean === "/") return true;
+    if (clean === "/") {
+      matchers.push({ type: "all" });
+      continue;
+    }
 
     const withoutLeading = clean.replace(/^\/+/, "");
     const hasSubpath = withoutLeading.includes("/");
 
     if (hasSubpath) {
       const normalized = clean.endsWith("/") ? clean.slice(0, -1) : clean;
-      return pathname === normalized || pathname.startsWith(normalized + "/");
+      matchers.push({ type: "subpath", value: normalized });
+      continue;
     }
 
     const segment = withoutLeading.replace(/\/+$/g, "");
-    if (!segment) return false;
+    if (!segment) continue;
 
     const escaped = segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const reSegment = new RegExp(`(^|\\/)${escaped}(\\/|$)`);
-    return reSegment.test(pathname);
-  });
+    matchers.push({ type: "segment", re: new RegExp(`(^|\\/)${escaped}(\\/|$)`) });
+  }
+
+  return matchers;
 }
 
+function isExcludedByPathname(pathnameLower, matchers) {
+  if (!matchers || matchers.length === 0) return false;
+  for (const m of matchers) {
+    if (m.type === "all") return true;
+    if (m.type === "subpath") {
+      if (pathnameLower === m.value || pathnameLower.startsWith(m.value + "/")) return true;
+    } else if (m.type === "segment") {
+      if (m.re.test(pathnameLower)) return true;
+    }
+  }
+  return false;
+}
 
-
-
-function isJobDetailPage(urlString) {
-  const u = new URL(urlString);
-  const pathName = u.pathname.toLowerCase();
+function isJobDetailPage(pathnameLower) {
+  const pathName = pathnameLower || "";
 
   const jobKeyword =
     pathName.includes("/job") ||
@@ -343,6 +365,7 @@ app.post("/api/crawl", async (req, res) => {
   const options = { ...DEFAULTS, ...(req.body?.options || {}) };
   delete options.languagePrefixes;
   options.pathLimits = sanitizePathLimits(options.pathLimits);
+  const excludePathMatchers = buildExcludeMatchers(options.excludePaths);
   const userAgent = "SiteCrawler/1.0";
 
   let root;
@@ -353,6 +376,7 @@ app.post("/api/crawl", async (req, res) => {
   }
 
   const origin = root.origin;
+  const rootHost = root.host;
   const start = normalizeUrl(url, null, options);
   if (!start) return res.status(400).json({ error: "Invalid URL" });
 
@@ -364,24 +388,12 @@ app.post("/api/crawl", async (req, res) => {
   } catch {
     startPathScope = "/";
   }
-
-  function isWithinStartScope(urlString) {
-    if (!options.scopeToStartPath) return true;
-    if (!startPathScope || startPathScope === "/") return true;
-    try {
-      const u = new URL(urlString);
-      const pathname = String(u.pathname || "/");
-      const scope = startPathScope.endsWith("/") ? startPathScope.slice(0, -1) : startPathScope;
-      if (scope === "/") return true;
-      return pathname === scope || pathname.startsWith(scope + "/");
-    } catch {
-      return false;
-    }
-  }
+  const startScope = !startPathScope || startPathScope === "/" ? "/" : (startPathScope.endsWith("/") ? startPathScope.slice(0, -1) : startPathScope);
 
   const robots = await fetchRobots(origin, options.timeoutMs, userAgent);
 
-  const toVisit = new Set();
+  const toVisitQueue = [];
+  const toVisitSet = new Set();
   const visited = new Set();
   const blockedByPathLimit = new Set();
   const discovered = new Set();
@@ -389,25 +401,30 @@ app.post("/api/crawl", async (req, res) => {
   const pathLimitCounters = new Map();
   const pathLimitSkipped = {};
 
+  function enqueue(urlString) {
+    if (visited.has(urlString) || blockedByPathLimit.has(urlString) || toVisitSet.has(urlString)) return;
+    if (visited.size + toVisitSet.size >= options.maxPages) return;
+    toVisitSet.add(urlString);
+    toVisitQueue.push(urlString);
+  }
+
   const sitemapUrls = await fetchSitemapUrls(origin, options.timeoutMs, robots, userAgent);
   if (sitemapUrls.length) {
     sitemapUrls.forEach((u) => {
       const n = normalizeUrl(u, null, options);
       if (!n) return;
 
-      if (options.scopeToStartPath && startPathScope !== "/") {
-        try {
-          const p = new URL(n).pathname;
-          if (p !== startPathScope && !p.startsWith(startPathScope + "/")) return;
-        } catch {
-          return;
-        }
+      const parts = parseUrlParts(n);
+      if (!parts) return;
+      if (options.sameHostOnly && parts.host !== rootHost) return;
+      if (options.scopeToStartPath && startScope !== "/") {
+        if (!(parts.pathname === startScope || parts.pathname.startsWith(startScope + "/"))) return;
       }
 
-      toVisit.add(n);
+      enqueue(n);
     });
   } else {
-    toVisit.add(start);
+    enqueue(start);
   }
 
   const records = new Map();
@@ -415,23 +432,17 @@ app.post("/api/crawl", async (req, res) => {
   async function processOne(currentUrl) {
     if (visited.has(currentUrl) || blockedByPathLimit.has(currentUrl)) return;
 
-    if (options.scopeToStartPath && startPathScope !== "/") {
-      try {
-        const p = new URL(currentUrl).pathname;
-        if (p !== startPathScope && !p.startsWith(startPathScope + "/")) return;
-      } catch {
-        return;
-      }
+    const parts = parseUrlParts(currentUrl);
+    if (!parts) return;
+    const pathname = parts.pathname || "/";
+    const pathnameLower = pathname.toLowerCase();
+
+    if (options.scopeToStartPath && startScope !== "/") {
+      if (!(pathname === startScope || pathname.startsWith(startScope + "/"))) return;
     }
 
     if (options.pathLimits && options.pathLimits.length) {
-      let normalizedPath = "/";
-      try {
-        const u = new URL(currentUrl);
-        normalizedPath = normalizePathForRules(u.pathname).toLowerCase();
-      } catch {
-        normalizedPath = "/";
-      }
+      const normalizedPath = normalizePathForRules(pathname).toLowerCase();
 
       for (const rule of options.pathLimits) {
         const rulePath = String(rule.path || "").trim().toLowerCase();
@@ -455,13 +466,12 @@ app.post("/api/crawl", async (req, res) => {
     visited.add(currentUrl);
 
     if (options.sameHostOnly) {
-      const u = new URL(currentUrl);
-      if (u.host !== root.host) return;
+      if (parts.host !== rootHost) return;
     }
 
     if (hasExcludedExtension(currentUrl, options)) return;
-    if (isExcludedByPath(currentUrl, options.excludePaths)) return;
-    if (options.ignoreJobPages && isJobDetailPage(currentUrl)) return;
+    if (isExcludedByPathname(pathnameLower, excludePathMatchers)) return;
+    if (options.ignoreJobPages && isJobDetailPage(pathnameLower)) return;
 
     const r = await fetchText(currentUrl, options.timeoutMs, robots, userAgent);
 
@@ -489,56 +499,55 @@ app.post("/api/crawl", async (req, res) => {
       const next = normalizeUrl(href, baseForLinks, options);
       if (!next) return;
 
-      if (options.scopeToStartPath && startPathScope !== "/") {
-        try {
-          const p = new URL(next).pathname;
-          if (p !== startPathScope && !p.startsWith(startPathScope + "/")) return;
-        } catch {
-          return;
-        }
+      const nextParts = parseUrlParts(next);
+      if (!nextParts) return;
+      const nextPathname = nextParts.pathname || "/";
+      const nextPathnameLower = nextPathname.toLowerCase();
+
+      if (options.scopeToStartPath && startScope !== "/") {
+        if (!(nextPathname === startScope || nextPathname.startsWith(startScope + "/"))) return;
       }
 
-      if (options.sameHostOnly) {
-        try {
-          const u = new URL(next);
-          if (u.host !== root.host) return;
-        } catch {
-          return;
-        }
-      }
+      if (options.sameHostOnly && nextParts.host !== rootHost) return;
 
       if (hasExcludedExtension(next, options)) return;
-      if (isExcludedByPath(next, options.excludePaths)) return;
-      if (options.ignoreJobPages && isJobDetailPage(next)) return;
-      if (!isWithinStartScope(next)) return;
+      if (isExcludedByPathname(nextPathnameLower, excludePathMatchers)) return;
+      if (options.ignoreJobPages && isJobDetailPage(nextPathnameLower)) return;
 
       links.push(next);
     });
 
     for (const next of links) {
-      if (visited.size + toVisit.size >= options.maxPages) break;
-      if (!visited.has(next) && !blockedByPathLimit.has(next)) toVisit.add(next);
+      if (visited.size + toVisitSet.size >= options.maxPages) break;
+      enqueue(next);
     }
   }
 
-  while (toVisit.size > 0 && visited.size < options.maxPages) {
-    const batch = Array.from(toVisit).slice(0, options.concurrency * 2);
-    batch.forEach((u) => toVisit.delete(u));
+  while (toVisitQueue.length > 0 && visited.size < options.maxPages) {
+    const batch = toVisitQueue.splice(0, options.concurrency * 2);
+    batch.forEach((u) => toVisitSet.delete(u));
     await concurrencyMap(batch, options.concurrency, processOne);
   }
 
   const urls = Array.from(discovered).sort();
 
   if (options.brokenLinkCheck) {
-    await concurrencyMap(urls, Math.min(options.concurrency, 6), async (u) => {
-      const s = await quickStatus(u, options.timeoutMs, robots, userAgent);
-      const existing = records.get(u) || { url: u, finalUrl: u, status: null, blockedByRobots: false };
-      existing.status = s.status;
-      existing.finalUrl = s.finalUrl || existing.finalUrl || u;
-      existing.blockedByRobots = !!s.blockedByRobots;
-      records.set(u, existing);
-      return true;
+    const missingStatus = urls.filter((u) => {
+      const existing = records.get(u);
+      return existing?.status === null || existing?.status === undefined;
     });
+
+    if (missingStatus.length) {
+      await concurrencyMap(missingStatus, Math.min(options.concurrency, 6), async (u) => {
+        const s = await quickStatus(u, options.timeoutMs, robots, userAgent);
+        const existing = records.get(u) || { url: u, finalUrl: u, status: null, blockedByRobots: false };
+        existing.status = s.status;
+        existing.finalUrl = s.finalUrl || existing.finalUrl || u;
+        existing.blockedByRobots = !!s.blockedByRobots;
+        records.set(u, existing);
+        return true;
+      });
+    }
   }
 
   const out = urls.map((u) => records.get(u) || { url: u, finalUrl: u, status: null, blockedByRobots: false });
