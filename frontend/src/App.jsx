@@ -98,7 +98,16 @@ export default function App() {
   const [presets, setPresets] = useState([]);
   const [presetName, setPresetName] = useState("default");
   const fileInputRef = useRef(null);
-  const [isBookmarklet, setIsBookmarklet] = useState(false);
+  const [isBookmarklet, setIsBookmarklet] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      const mode = String(params.get("mode") || "").toLowerCase();
+      const flag = String(params.get("bookmarklet") || "").toLowerCase();
+      return mode === "bookmarklet" || flag === "1" || flag === "true";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const stored = safeJsonParse(localStorage.getItem(STORAGE_KEY), []);
@@ -120,15 +129,7 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search || "");
-    const mode = String(params.get("mode") || "").toLowerCase();
-    const flag = String(params.get("bookmarklet") || "").toLowerCase();
     const targetUrl = params.get("url");
-
-    const inBookmarklet = mode === "bookmarklet" || flag === "1" || flag === "true";
-    if (inBookmarklet) {
-      setIsBookmarklet(true);
-    }
-
     if (targetUrl) {
       setUrl(targetUrl);
     }
@@ -136,12 +137,7 @@ export default function App() {
 
   useEffect(() => {
     let isMounted = true;
-    const params = new URLSearchParams(window.location.search || "");
-    const mode = String(params.get("mode") || "").toLowerCase();
-    const flag = String(params.get("bookmarklet") || "").toLowerCase();
-    const inBookmarklet = mode === "bookmarklet" || flag === "1" || flag === "true";
-
-    if (inBookmarklet) {
+    if (isBookmarklet) {
       setPinRequired(false);
       setIsUnlocked(true);
       setPin("");
@@ -542,7 +538,7 @@ export default function App() {
 
           <nav className="nav" aria-label="Primary">
             <a className="navPill" href="#howto">How to use</a>
-            <a className="navPill" href="#access">Access</a>
+            {!isBookmarklet ? <a className="navPill" href="#access">Access</a> : null}
             <a className="navPill" href="#runner">Runner</a>
             <a className="navPill" href="#presets">Presets</a>
             <a className="navPill" href="#results">Results</a>
