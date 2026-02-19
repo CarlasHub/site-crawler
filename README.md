@@ -46,7 +46,7 @@
 
 This project is deployed on Google Cloud Run:
 
-https://site-crawler-909296093050.europe-west2.run.app/
+https://redesigned-chainsaw-5l7vjn3.pages.github.io/
 
 ---
 
