@@ -44,9 +44,11 @@
 
 ## Live demo
 
-This project is deployed on Google Cloud Run:
+This project is deployed on a personal Cloud Run host:
 
-https://redesigned-chainsaw-5l7vjn3.pages.github.io/
+https://site-crawler-909296093050.europe-west2.run.app/
+
+For production use, deploy to **your own** Cloud Run service and update `APP_ORIGIN` in `docs/bookmarklet.js`.
 
 ---
 
