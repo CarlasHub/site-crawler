@@ -1,6 +1,6 @@
 (() => {
   const APP_ORIGIN = "https://site-crawler-909296093050.europe-west2.run.app";
-  const ROOT_ID = "a11y-cat-root";
+  const ROOT_ID = "cat-crawler-root";
   const existing = document.getElementById(ROOT_ID);
 
   if (existing) {
@@ -20,7 +20,7 @@
       z-index: 2147483647;
       font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
     }
-    #${ROOT_ID} .a11y-cat-button {
+    #${ROOT_ID} .cat-crawler-button {
       width: 56px;
       height: 56px;
       border-radius: 999px;
@@ -29,7 +29,7 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.35);
       cursor: pointer;
     }
-    #${ROOT_ID} .a11y-cat-panel {
+    #${ROOT_ID} .cat-crawler-panel {
       position: fixed;
       right: 16px;
       bottom: 88px;
@@ -42,10 +42,10 @@
       overflow: hidden;
       display: none;
     }
-    #${ROOT_ID} .a11y-cat-panel.is-open {
+    #${ROOT_ID} .cat-crawler-panel.is-open {
       display: block;
     }
-    #${ROOT_ID} .a11y-cat-bar {
+    #${ROOT_ID} .cat-crawler-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -55,7 +55,7 @@
       font-weight: 700;
       font-size: 13px;
     }
-    #${ROOT_ID} .a11y-cat-close {
+    #${ROOT_ID} .cat-crawler-close {
       border: 1px solid rgba(255,255,255,0.2);
       background: transparent;
       color: #fff;
@@ -74,26 +74,26 @@
   `;
 
   const button = document.createElement("button");
-  button.className = "a11y-cat-button";
-  button.title = "A11y Cat";
+  button.className = "cat-crawler-button";
+  button.title = "Cat Crawler";
   button.type = "button";
 
   const panel = document.createElement("div");
-  panel.className = "a11y-cat-panel";
+  panel.className = "cat-crawler-panel";
 
   const bar = document.createElement("div");
-  bar.className = "a11y-cat-bar";
-  bar.textContent = "A11y Cat";
+  bar.className = "cat-crawler-bar";
+  bar.textContent = "Cat Crawler";
 
   const closeBtn = document.createElement("button");
-  closeBtn.className = "a11y-cat-close";
+  closeBtn.className = "cat-crawler-close";
   closeBtn.type = "button";
   closeBtn.textContent = "Close";
 
   const iframe = document.createElement("iframe");
   const targetUrl = encodeURIComponent(window.location.href);
   iframe.src = `${APP_ORIGIN}/?mode=bookmarklet&url=${targetUrl}`;
-  iframe.title = "A11y Cat";
+  iframe.title = "Cat Crawler";
 
   closeBtn.addEventListener("click", () => {
     panel.classList.remove("is-open");
