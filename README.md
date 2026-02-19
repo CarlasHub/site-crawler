@@ -1,4 +1,4 @@
-# Site Crawler
+# Cat Crawler
 
 > Discover internal URLs with exclusions, redirects, duplicates, presets, language-agnostic path limits, and optional access control.
 
@@ -20,7 +20,8 @@
 - Configuration and environment variables
 - Deploy to Google Cloud Run
 - Performance and roadmap
-- Bookmarklet (A11y Cat)
+- Bookmarklet (Cat Crawler)
+- GitHub Pages (Landing)
 
 ---
 
@@ -180,10 +181,26 @@ Request body:
 
 ---
 
-## Bookmarklet (A11y Cat)
+## Bookmarklet (Cat Crawler)
 
 Use the crawler on the page you are currently visiting.
 
 1. Open `docs/bookmarklet.js` and set `APP_ORIGIN` to your deployed app URL.
 2. Create a new browser bookmark and paste the file contents as the URL (prefix with `javascript:`).
-3. Click the bookmark on any site to open **A11y Cat**. It auto-fills the current page URL.
+3. Click the bookmark on any site to open **Cat Crawler**. It auto-fills the current page URL.
+
+---
+
+## GitHub Pages (Landing)
+
+The landing page lives in `docs/index.html`.
+
+Enable Pages:
+1. Go to **Settings → Pages**.
+2. **Source**: Deploy from a branch.
+3. **Branch**: `main`.
+4. **Folder**: `/docs`.
+5. Save.
+
+Then visit:
+`https://<org-or-user>.github.io/site-crawler/`
