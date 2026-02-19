@@ -82,6 +82,19 @@ https://site-crawler-909296093050.europe-west2.run.app/
 7. Run the crawl.
 8. Review results and export TXT or CSV if needed.
 
+### Quick start (step-by-step)
+1. Paste the site homepage in **Homepage URL** (e.g. `https://example.com`).
+2. Add **Exclude paths** (one per line). Only lines starting with `/` are used.
+3. Add **Crawl limits by path** to cap noisy sections (e.g. `/job` max 5).
+4. Set **Max pages** and **Concurrency** based on how deep you want to go.
+5. Toggle **Ignore job pages** or **Broken link quick check** if needed.
+6. Click **Run crawl**, then download **TXT** or **CSV** from Results.
+
+Tip: if you enable **Broken link quick check**, you can filter status codes to spot 404s quickly.
+
+### Landing page
+See a marketing-style overview at `docs/landing.html` (matches the in-app color scheme).
+
 ### Access control
 - The frontend checks if a pin is required via `GET /api/config`.
 - If enabled, the user must unlock the runner using `POST /api/auth`.

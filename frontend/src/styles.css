@@ -997,6 +997,57 @@
   .shell--bookmarklet .brandTag {
     max-width: 52ch;
   }
+
+  /* === HOW TO STEPS === */
+  .stepGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+
+  .stepCard {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    padding: 16px;
+    border-radius: var(--radiusSm);
+    background: var(--bg-card);
+    border: 1px solid var(--stroke);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .stepNum {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: #081017;
+  }
+
+  .stepCard h3 {
+    margin: 0 0 6px 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-high);
+  }
+
+  .noteRow {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+  }
+
+  .noteCard {
+    padding: 14px 16px;
+    border-radius: var(--radiusSm);
+    background: rgba(0, 229, 255, 0.06);
+    border: 1px solid var(--stroke2);
+    color: var(--text-mid);
+  }
    
    /* === FOOTER === */
    .footer {

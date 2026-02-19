@@ -525,6 +525,7 @@ export default function App() {
           </div>
 
           <nav className="nav" aria-label="Primary">
+            <a className="navPill" href="#howto">How to use</a>
             <a className="navPill" href="#access">Access</a>
             <a className="navPill" href="#runner">Runner</a>
             <a className="navPill" href="#presets">Presets</a>
@@ -585,6 +586,69 @@ export default function App() {
               ))}
             </div>
           ) : null}
+
+          <section id="howto" className="panel" aria-labelledby="howtoTitle">
+            <div className="panelHead">
+              <h2 id="howtoTitle">How to use the crawler</h2>
+              <div className="panelMeta">
+                <span className="chip">5 steps</span>
+                <span className="chip">Fast setup</span>
+              </div>
+            </div>
+
+            <div className="panelBody">
+              <div className="stepGrid" role="list">
+                <div className="stepCard" role="listitem">
+                  <div className="stepNum">1</div>
+                  <div>
+                    <h3>Enter a homepage URL</h3>
+                    <p className="help">Use the root of the site you want to crawl (e.g. `https://example.com`).</p>
+                  </div>
+                </div>
+
+                <div className="stepCard" role="listitem">
+                  <div className="stepNum">2</div>
+                  <div>
+                    <h3>Add exclusions</h3>
+                    <p className="help">One path per line (e.g. `/jobs`, `/careers`, `/admin`). Only lines starting with `/` are used.</p>
+                  </div>
+                </div>
+
+                <div className="stepCard" role="listitem">
+                  <div className="stepNum">3</div>
+                  <div>
+                    <h3>Set path limits</h3>
+                    <p className="help">Cap noisy sections (e.g. `/job` max 5). Rules are language-agnostic, so `/job` also matches `/en/job`.</p>
+                  </div>
+                </div>
+
+                <div className="stepCard" role="listitem">
+                  <div className="stepNum">4</div>
+                  <div>
+                    <h3>Choose options</h3>
+                    <p className="help">Max pages, concurrency, and toggles like “Ignore job pages” or “Broken link quick check.”</p>
+                  </div>
+                </div>
+
+                <div className="stepCard" role="listitem">
+                  <div className="stepNum">5</div>
+                  <div>
+                    <h3>Run and export</h3>
+                    <p className="help">Click “Run crawl,” then download TXT or CSV from the Results section.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="noteRow">
+                <div className="noteCard">
+                  <strong>Tip:</strong> Enable “Broken link quick check” to see HTTP status codes and spot 404s quickly.
+                </div>
+                <div className="noteCard">
+                  <strong>Bookmarklet:</strong> Use `docs/bookmarklet.js` to run the crawler in-page on any site.
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section id="access" className="panel" aria-labelledby="accessTitle">
             <div className="panelHead">
