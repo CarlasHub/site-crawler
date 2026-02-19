@@ -9,14 +9,14 @@
         color-scheme: dark;
         --bg0: #05070d;
         --bg1: #0a0d14;
-        --bg-card: linear-gradient(165deg, rgba(18, 22, 32, 0.95), rgba(12, 15, 22, 0.90));
-        --bg-card-hover: linear-gradient(165deg, rgba(22, 27, 38, 0.98), rgba(14, 18, 26, 0.95));
+        --bg-card: rgba(18, 22, 32, 0.98);
+        --bg-card-hover: rgba(22, 27, 38, 0.98);
         --stroke: rgba(255, 255, 255, 0.08);
         --stroke2: rgba(255, 255, 255, 0.14);
         --text: #ffffff;
         --text-high: rgba(255, 255, 255, 0.98);
-        --text-mid: rgba(255, 255, 255, 0.78);
-        --muted: rgba(255, 255, 255, 0.55);
+        --text-mid: rgba(255, 255, 255, 0.88);
+        --muted: rgba(255, 255, 255, 0.7);
         --accent: #00e5ff;
         --accent-glow: rgba(0, 229, 255, 0.5);
         --accent2: #a855f7;
@@ -37,9 +37,10 @@
       body {
         margin: 0;
         font-family: var(--font);
-        background: #110f0f;
+        background: #0b0f16;
         color: var(--text);
-        line-height: 1.6;
+        line-height: 1.65;
+        font-size: 15px;
       }
 
       .wrap {
@@ -62,8 +63,8 @@
         align-items: center;
         padding: 6px 12px;
         border-radius: 999px;
-        background: rgba(0, 229, 255, 0.10);
-        color: var(--text-mid);
+        background: rgba(0, 229, 255, 0.14);
+        color: var(--text-high);
         border: 1px solid var(--stroke2);
         font-size: 12px;
         font-weight: 600;
@@ -71,12 +72,12 @@
 
       h1 {
         margin: 12px 0 10px;
-        font-size: 34px;
+        font-size: 36px;
         line-height: 1.2;
       }
 
       .sub {
-        color: var(--text-mid);
+        color: var(--text-high);
         max-width: 70ch;
       }
 
@@ -99,13 +100,18 @@
       }
 
       .btn-primary {
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
-        color: #081017;
+        background: var(--accent);
+        color: #061018;
+        border-color: rgba(0, 0, 0, 0.2);
+      }
+
+      .btn-primary:hover {
+        background: #35efff;
       }
 
       .btn-ghost {
         border-color: var(--stroke2);
-        color: var(--text);
+        color: var(--text-high);
         background: transparent;
       }
 
@@ -162,9 +168,9 @@
         margin-top: 14px;
         padding: 12px 14px;
         border-radius: 10px;
-        background: rgba(0, 229, 255, 0.08);
+        background: rgba(0, 229, 255, 0.12);
         border: 1px solid var(--stroke2);
-        color: var(--text-mid);
+        color: var(--text-high);
       }
 
       .list {
@@ -177,6 +183,14 @@
         margin-top: 48px;
         color: var(--muted);
         font-size: 12px;
+      }
+
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 2px 6px;
+        border-radius: 6px;
+        color: var(--text-high);
       }
     </style>
   </head>
