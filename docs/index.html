@@ -7,25 +7,13 @@
     <style>
       :root {
         color-scheme: dark;
-        --bg0: #05070d;
-        --bg1: #0a0d14;
-        --bg-card: rgba(18, 22, 32, 0.98);
-        --bg-card-hover: rgba(22, 27, 38, 0.98);
-        --stroke: rgba(255, 255, 255, 0.08);
-        --stroke2: rgba(255, 255, 255, 0.14);
+        --bg-base: #0b2b61;
+        --surface-primary: #0f3b7f;
+        --surface-secondary: #144a96;
+        --border: #1f5fb3;
+        --accent: #4cb6ff;
         --text: #ffffff;
-        --text-high: rgba(255, 255, 255, 0.98);
-        --text-mid: rgba(255, 255, 255, 0.88);
-        --muted: rgba(255, 255, 255, 0.7);
-        --accent: #00e5ff;
-        --accent-glow: rgba(0, 229, 255, 0.5);
-        --accent2: #a855f7;
-        --accent2-dim: rgba(168, 85, 247, 0.12);
-        --success: #22c55e;
-        --danger: #f43f5e;
-        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-        --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
-        --shadow-lg: 0 16px 64px rgba(0, 0, 0, 0.5);
+        --muted: #cfe0ff;
         --radius: 28px;
         --radius-sm: 12px;
         --max: 1100px;
@@ -37,7 +25,7 @@
       body {
         margin: 0;
         font-family: var(--font);
-        background: #0b0f16;
+        background: var(--bg-base);
         color: var(--text);
         line-height: 1.65;
         font-size: 15px;
@@ -50,11 +38,10 @@
       }
 
       .hero {
-        background: var(--bg-card);
-        border: 1px solid var(--stroke);
+        background: var(--surface-primary);
+        border: 1px solid var(--border);
         border-radius: var(--radius);
         padding: 32px;
-        box-shadow: var(--shadow-lg);
       }
 
       .tag {
@@ -63,9 +50,9 @@
         align-items: center;
         padding: 6px 12px;
         border-radius: 999px;
-        background: rgba(0, 229, 255, 0.14);
-        color: var(--text-high);
-        border: 1px solid var(--stroke2);
+        background: var(--surface-secondary);
+        color: var(--text);
+        border: 1px solid var(--border);
         font-size: 12px;
         font-weight: 600;
       }
@@ -77,7 +64,7 @@
       }
 
       .sub {
-        color: var(--text-high);
+        color: var(--text);
         max-width: 70ch;
       }
 
@@ -101,17 +88,17 @@
 
       .btn-primary {
         background: var(--accent);
-        color: #061018;
-        border-color: rgba(0, 0, 0, 0.2);
+        color: var(--bg-base);
+        border-color: var(--accent);
       }
 
       .btn-primary:hover {
-        background: #35efff;
+        background: var(--accent);
       }
 
       .btn-ghost {
-        border-color: var(--stroke2);
-        color: var(--text-high);
+        border-color: var(--border);
+        color: var(--text);
         background: transparent;
       }
 
@@ -126,11 +113,10 @@
       }
 
       .card {
-        background: var(--bg-card);
-        border: 1px solid var(--stroke);
+        background: var(--surface-primary);
+        border: 1px solid var(--border);
         border-radius: var(--radius-sm);
         padding: 18px;
-        box-shadow: var(--shadow-sm);
       }
 
       .card h3 {
@@ -138,7 +124,7 @@
         font-size: 16px;
       }
 
-      .card p { margin: 0; color: var(--text-mid); }
+      .card p { margin: 0; color: var(--muted); }
 
       .step {
         display: grid;
@@ -146,8 +132,8 @@
         gap: 12px;
         padding: 14px;
         border-radius: 12px;
-        border: 1px solid var(--stroke);
-        background: var(--bg-card);
+        border: 1px solid var(--border);
+        background: var(--surface-primary);
       }
 
       .step-num {
@@ -157,26 +143,26 @@
         display: grid;
         place-items: center;
         font-weight: 700;
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
-        color: #081017;
+        background: var(--accent);
+        color: var(--bg-base);
       }
 
       .step h4 { margin: 0 0 4px; font-size: 14px; }
-      .step p { margin: 0; color: var(--text-mid); }
+      .step p { margin: 0; color: var(--muted); }
 
       .note {
         margin-top: 14px;
         padding: 12px 14px;
         border-radius: 10px;
-        background: rgba(0, 229, 255, 0.12);
-        border: 1px solid var(--stroke2);
-        color: var(--text-high);
+        background: var(--surface-secondary);
+        border: 1px solid var(--border);
+        color: var(--text);
       }
 
       .list {
         margin: 8px 0 0;
         padding-left: 18px;
-        color: var(--text-mid);
+        color: var(--muted);
       }
 
       .footer {
@@ -187,10 +173,11 @@
 
       code {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        background: rgba(255, 255, 255, 0.08);
+        background: var(--surface-secondary);
         padding: 2px 6px;
         border-radius: 6px;
-        color: var(--text-high);
+        color: var(--text);
+        border: 1px solid var(--border);
       }
     </style>
   </head>
