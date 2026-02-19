@@ -41,6 +41,9 @@
       box-shadow: 0 18px 48px rgba(0,0,0,0.45);
       overflow: hidden;
       display: none;
+      resize: both;
+      min-width: 320px;
+      min-height: 280px;
     }
     #${ROOT_ID} .cat-crawler-panel.is-open {
       display: block;
