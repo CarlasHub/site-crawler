@@ -517,13 +517,24 @@ export default function App() {
     };
   }, [data, urls]);
 
-  const brandName = isBookmarklet ? "Cat Crawler" : "Carla’s tools";
-  const brandTag = isBookmarklet
+  const isBookmarkletNow = isBookmarklet || (() => {
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      const mode = String(params.get("mode") || "").toLowerCase();
+      const flag = String(params.get("bookmarklet") || "").toLowerCase();
+      return mode === "bookmarklet" || flag === "1" || flag === "true";
+    } catch {
+      return false;
+    }
+  })();
+
+  const brandName = isBookmarkletNow ? "Cat Crawler" : "Carla’s tools";
+  const brandTag = isBookmarkletNow
     ? "Cat Crawler - Site Crawler for the page you are on."
     : "Site Crawler - Discover internal URLs with exclusions, redirects, duplicates and presets.";
 
   return (
-    <div className={`shell${isBookmarklet ? " shell--bookmarklet" : ""}`}>
+    <div className={`shell${isBookmarkletNow ? " shell--bookmarklet" : ""}`}>
       <a className="skip" href="#main">Skip to content</a>
 
       <header className="header">
@@ -538,7 +549,7 @@ export default function App() {
 
           <nav className="nav" aria-label="Primary">
             <a className="navPill" href="#howto">How to use</a>
-            {!isBookmarklet ? <a className="navPill" href="#access">Access</a> : null}
+            {!isBookmarkletNow ? <a className="navPill" href="#access">Access</a> : null}
             <a className="navPill" href="#runner">Runner</a>
             <a className="navPill" href="#presets">Presets</a>
             <a className="navPill" href="#results">Results</a>
@@ -662,7 +673,7 @@ export default function App() {
             </div>
           </section>
 
-          {!isBookmarklet ? (
+          {!isBookmarkletNow ? (
             <section id="access" className="panel" aria-labelledby="accessTitle">
               <div className="panelHead">
                 <h2 id="accessTitle">Access control</h2>
