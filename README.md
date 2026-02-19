@@ -189,6 +189,8 @@ Use the crawler on the page you are currently visiting.
 2. Create a new browser bookmark and paste the file contents as the URL (prefix with `javascript:`).
 3. Click the bookmark on any site to open **Cat Crawler**. It auto-fills the current page URL.
 
+Tip: The landing page button **Cat Crawler 😼** is a live bookmarklet link, so you can drag it to your bookmarks bar to install the latest script.
+
 ---
 
 ## GitHub Pages (Landing)
