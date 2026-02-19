@@ -39,7 +39,7 @@
       border: 1px solid rgba(0,0,0,0.2);
       background: #0b0b0b;
       box-shadow: 0 18px 48px rgba(0,0,0,0.45);
-      overflow: hidden;
+      overflow: auto;
       display: none;
       resize: both;
       min-width: 320px;
