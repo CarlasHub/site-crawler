@@ -521,9 +521,9 @@ export default function App() {
     };
   }, [data, urls]);
 
-  const brandName = isBookmarklet ? "A11y Cat" : "Carla’s tools";
+  const brandName = isBookmarklet ? "Cat Crawler" : "Carla’s tools";
   const brandTag = isBookmarklet
-    ? "A11y Cat - Site Crawler for the page you are on."
+    ? "Cat Crawler - Site Crawler for the page you are on."
     : "Site Crawler - Discover internal URLs with exclusions, redirects, duplicates and presets.";
 
   return (
@@ -666,45 +666,47 @@ export default function App() {
             </div>
           </section>
 
-          <section id="access" className="panel" aria-labelledby="accessTitle">
-            <div className="panelHead">
-              <h2 id="accessTitle">Access control</h2>
-              <div className="panelMeta">
-                <span className="chip">
-                  {pinRequired ? (isUnlocked ? "Unlocked" : "Locked") : "Open"}
-                </span>
-              </div>
-            </div>
-
-            <div className="panelBody">
-              <h3 className="panelSubTitle">Enter your pin to access the runner access control</h3>
-              <p className="help">
-                If a pin is configured on the server, you must unlock the runner before you can start a crawl. If no pin is configured, the runner is open.
-              </p>
-
-              <div className="formGrid">
-                <div className="field">
-                  <label htmlFor="pin">Pin</label>
-                  <input
-                    id="pin"
-                    type="password"
-                    inputMode="text"
-                    autoComplete="off"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder={pinRequired ? "Enter pin" : "No pin required"}
-                    disabled={!pinRequired || isUnlocked}
-                  />
-                </div>
-
-                <div className="actions">
-                  <button className="btnPrimary" type="button" onClick={unlockRunner} disabled={!pinRequired || isUnlocked}>
-                    {pinRequired ? (isUnlocked ? "Runner unlocked" : "Unlock runner") : "Runner open"}
-                  </button>
+          {!isBookmarklet ? (
+            <section id="access" className="panel" aria-labelledby="accessTitle">
+              <div className="panelHead">
+                <h2 id="accessTitle">Access control</h2>
+                <div className="panelMeta">
+                  <span className="chip">
+                    {pinRequired ? (isUnlocked ? "Unlocked" : "Locked") : "Open"}
+                  </span>
                 </div>
               </div>
-            </div>
-          </section>
+
+              <div className="panelBody">
+                <h3 className="panelSubTitle">Enter your pin to access the runner access control</h3>
+                <p className="help">
+                  If a pin is configured on the server, you must unlock the runner before you can start a crawl. If no pin is configured, the runner is open.
+                </p>
+
+                <div className="formGrid">
+                  <div className="field">
+                    <label htmlFor="pin">Pin</label>
+                    <input
+                      id="pin"
+                      type="password"
+                      inputMode="text"
+                      autoComplete="off"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value)}
+                      placeholder={pinRequired ? "Enter pin" : "No pin required"}
+                      disabled={!pinRequired || isUnlocked}
+                    />
+                  </div>
+
+                  <div className="actions">
+                    <button className="btnPrimary" type="button" onClick={unlockRunner} disabled={!pinRequired || isUnlocked}>
+                      {pinRequired ? (isUnlocked ? "Runner unlocked" : "Unlock runner") : "Runner open"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <section id="runner" className="panel" aria-labelledby="runnerTitle">
             <div className="panelHead">
