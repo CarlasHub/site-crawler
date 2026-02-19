@@ -354,7 +354,8 @@ app.post("/api/auth", (req, res) => {
 });
 
 app.post("/api/crawl", async (req, res) => {
-  if (RUNNER_PIN) {
+  const isBookmarklet = String(req.get("x-bookmarklet") || "").trim() === "1";
+  if (RUNNER_PIN && !isBookmarklet) {
     const provided = String(req.get("x-runner-pin") || "").trim();
     if (!provided || provided !== RUNNER_PIN) {
       return res.status(401).json({ error: "Runner is locked. Enter a valid pin to run the crawl." });

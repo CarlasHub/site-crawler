@@ -136,6 +136,21 @@ export default function App() {
 
   useEffect(() => {
     let isMounted = true;
+    const params = new URLSearchParams(window.location.search || "");
+    const mode = String(params.get("mode") || "").toLowerCase();
+    const flag = String(params.get("bookmarklet") || "").toLowerCase();
+    const inBookmarklet = mode === "bookmarklet" || flag === "1" || flag === "true";
+
+    if (inBookmarklet) {
+      setPinRequired(false);
+      setIsUnlocked(true);
+      setPin("");
+      setRunnerPin("");
+      return () => {
+        isMounted = false;
+      };
+    }
+
     fetch("/api/config")
       .then((r) => r.json())
       .then((json) => {
@@ -427,6 +442,7 @@ export default function App() {
     setLoading(true);
     try {
       const headers = { "Content-Type": "application/json" };
+      if (isBookmarklet) headers["x-bookmarklet"] = "1";
       if (pinRequired) headers["x-runner-pin"] = runnerPin.trim();
 
       const res = await fetch("/api/crawl", {
