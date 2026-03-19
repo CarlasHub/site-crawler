@@ -1182,6 +1182,69 @@ function getEntryFinalUrlForImpact(entry) {
   return String(entry?.finalResolvedUrl || entry?.finalUrl || getEntryOriginalUrlForImpact(entry));
 }
 
+function buildIssueReport(auditEntries, redirectAuditEntries, parameterAuditEntries, softFailureEntries, impactAudit) {
+  const brokenUrls = (Array.isArray(auditEntries) ? auditEntries : [])
+    .filter((entry) => Number(entry.statusCode || 0) >= 400 || entry.classification === "broken")
+    .map((entry) => ({
+      originalUrl: entry.originalUrl,
+      referrerPage: entry.referrerPage,
+      sourceType: entry.sourceType,
+      finalResolvedUrl: entry.finalResolvedUrl,
+      statusCode: entry.statusCode,
+      classification: entry.classification
+    }));
+
+  const redirectIssues = (Array.isArray(redirectAuditEntries) ? redirectAuditEntries : [])
+    .filter((entry) => entry.hasIssue)
+    .map((entry) => ({
+      originalUrl: entry.originalUrl,
+      referrerPage: entry.referrerPage,
+      finalResolvedUrl: entry.finalResolvedUrl,
+      statusCode: entry.statusCode,
+      redirectStepCount: entry.redirectStepCount,
+      loopDetected: entry.loopDetected,
+      multipleHops: entry.multipleHops,
+      paramsLost: entry.paramsLost,
+      irrelevantDestination: entry.irrelevantDestination,
+      maxRedirectsExceeded: entry.maxRedirectsExceeded
+    }));
+
+  const parameterHandlingIssues = (Array.isArray(parameterAuditEntries) ? parameterAuditEntries : [])
+    .filter((entry) => entry.hasIssue)
+    .map((entry) => ({
+      baseUrl: entry.baseUrl,
+      parameterizedUrl: entry.parameterizedUrl,
+      finalUrl: entry.finalUrl,
+      statusCode: entry.statusCode,
+      paramsDropped: entry.paramsDropped,
+      unexpectedRedirect: entry.unexpectedRedirect
+    }));
+
+  const softFailures = (Array.isArray(softFailureEntries) ? softFailureEntries : [])
+    .map((entry) => ({
+      url: entry.url,
+      finalUrl: entry.finalUrl,
+      statusCode: entry.statusCode,
+      reasons: entry.softFailureReasons,
+      apiFailures: entry.apiFailures
+    }));
+
+  return {
+    brokenUrls,
+    redirectIssues,
+    parameterHandlingIssues,
+    softFailures,
+    impactAnalysis: Array.isArray(impactAudit?.entries) ? impactAudit.entries : [],
+    summary: {
+      brokenUrls: brokenUrls.length,
+      redirectIssues: redirectIssues.length,
+      parameterHandlingIssues: parameterHandlingIssues.length,
+      softFailures: softFailures.length,
+      impactIssues: Array.isArray(impactAudit?.entries) ? impactAudit.entries.length : 0
+    }
+  };
+}
+
 function concurrencyMap(items, limit, fn) {
   return new Promise((resolve) => {
     const results = new Array(items.length);
@@ -1719,6 +1782,14 @@ app.post("/api/crawl", async (req, res) => {
     };
   }
 
+  const issueReport = buildIssueReport(
+    auditEntries,
+    redirectAuditEntries,
+    parameterAudit.entries,
+    softFailureEntries,
+    impactAudit
+  );
+
   return res.json({
     startUrl: start,
     origin,
@@ -1749,7 +1820,8 @@ app.post("/api/crawl", async (req, res) => {
       entries: softFailureEntries
     },
     patternAudit,
-    parameterAudit
+    parameterAudit,
+    issueReport
   });
 });
 

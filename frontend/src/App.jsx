@@ -210,6 +210,7 @@ export default function App() {
   const pageUrls = data?.urls || [];
   const auditEntries = data?.audit?.entries || pageUrls;
   const auditSummary = data?.audit?.summary || null;
+  const issueReport = data?.issueReport || null;
   const impactAuditEntries = data?.impactAudit?.entries || [];
   const impactAuditSummary = data?.impactAudit?.summary || null;
   const redirectAuditEntries = data?.redirectAudit?.entries || [];
@@ -1020,6 +1021,124 @@ export default function App() {
                     {parameterAuditEntries.filter((entry) => entry.hasIssue).length > 80 ? (
                       <p className="muted">Showing first 80 parameter issues.</p>
                     ) : null}
+                  </div>
+                </details>
+              ) : null}
+
+              {issueReport ? (
+                <details className="details" open={(issueReport.summary?.brokenUrls + issueReport.summary?.redirectIssues + issueReport.summary?.parameterHandlingIssues + issueReport.summary?.softFailures) > 0}>
+                  <summary>Validation report</summary>
+                  <div className="dupes">
+                    <p className="help">
+                      Broken URLs {issueReport.summary?.brokenUrls ?? 0}, redirect issues {issueReport.summary?.redirectIssues ?? 0}, parameter handling issues {issueReport.summary?.parameterHandlingIssues ?? 0}, soft failures {issueReport.summary?.softFailures ?? 0}, impact issues {issueReport.summary?.impactIssues ?? 0}.
+                    </p>
+
+                    <p className="help"><strong>Broken URLs</strong></p>
+                    {issueReport.brokenUrls?.length ? (
+                      issueReport.brokenUrls.slice(0, 20).map((entry, index) => (
+                        <div key={`broken-${entry.originalUrl}-${index}`} className="dupeGroup">
+                          <div className="dupeHead">
+                            <div className="dupeBase">{entry.originalUrl}</div>
+                            <div className="dupeFlags">
+                              <span className="flag">status {entry.statusCode ?? "n/a"}</span>
+                            </div>
+                          </div>
+                          <ul className="dupeList">
+                            <li>Referrer: {entry.referrerPage || "start"}</li>
+                            <li>Final URL: {entry.finalResolvedUrl}</li>
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">No broken URLs.</p>
+                    )}
+
+                    <p className="help"><strong>Redirect issues</strong></p>
+                    {issueReport.redirectIssues?.length ? (
+                      issueReport.redirectIssues.slice(0, 20).map((entry, index) => (
+                        <div key={`redirect-${entry.originalUrl}-${index}`} className="dupeGroup">
+                          <div className="dupeHead">
+                            <div className="dupeBase">{entry.originalUrl}</div>
+                            <div className="dupeFlags">
+                              <span className="flag">hops {entry.redirectStepCount}</span>
+                              {entry.loopDetected ? <span className="flag">loop</span> : null}
+                              {entry.multipleHops ? <span className="flag">multi-hop</span> : null}
+                              {entry.paramsLost ? <span className="flag">params lost</span> : null}
+                            </div>
+                          </div>
+                          <ul className="dupeList">
+                            <li>Referrer: {entry.referrerPage || "start"}</li>
+                            <li>Final URL: {entry.finalResolvedUrl}</li>
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">No redirect issues.</p>
+                    )}
+
+                    <p className="help"><strong>Parameter handling issues</strong></p>
+                    {issueReport.parameterHandlingIssues?.length ? (
+                      issueReport.parameterHandlingIssues.slice(0, 20).map((entry, index) => (
+                        <div key={`param-${entry.parameterizedUrl}-${index}`} className="dupeGroup">
+                          <div className="dupeHead">
+                            <div className="dupeBase">{entry.parameterizedUrl}</div>
+                            <div className="dupeFlags">
+                              <span className="flag">status {entry.statusCode ?? "n/a"}</span>
+                              {entry.paramsDropped ? <span className="flag">params dropped</span> : null}
+                              {entry.unexpectedRedirect ? <span className="flag">unexpected redirect</span> : null}
+                            </div>
+                          </div>
+                          <ul className="dupeList">
+                            <li>Base URL: {entry.baseUrl}</li>
+                            <li>Final URL: {entry.finalUrl}</li>
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">No parameter handling issues.</p>
+                    )}
+
+                    <p className="help"><strong>Soft failures</strong></p>
+                    {issueReport.softFailures?.length ? (
+                      issueReport.softFailures.slice(0, 20).map((entry, index) => (
+                        <div key={`soft-${entry.url}-${index}`} className="dupeGroup">
+                          <div className="dupeHead">
+                            <div className="dupeBase">{entry.url}</div>
+                            <div className="dupeFlags">
+                              <span className="flag">status {entry.statusCode ?? "n/a"}</span>
+                            </div>
+                          </div>
+                          <ul className="dupeList">
+                            <li>Final URL: {entry.finalUrl}</li>
+                            <li>Reasons: {Array.isArray(entry.reasons) ? entry.reasons.join(", ") : "n/a"}</li>
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">No soft failures.</p>
+                    )}
+
+                    <p className="help"><strong>Impact analysis</strong></p>
+                    {issueReport.impactAnalysis?.length ? (
+                      issueReport.impactAnalysis.slice(0, 20).map((entry) => (
+                        <div key={`impact-${entry.issueType}-${entry.originalUrl}`} className="dupeGroup">
+                          <div className="dupeHead">
+                            <div className="dupeBase">{entry.originalUrl}</div>
+                            <div className="dupeFlags">
+                              <span className="flag">{entry.impactLevel}</span>
+                              <span className="flag">{entry.issueType}</span>
+                            </div>
+                          </div>
+                          <ul className="dupeList">
+                            <li>Occurrences: {entry.occurrenceCount}</li>
+                            <li>Referrers: {entry.referrerCount}</li>
+                            <li>Reasons: {Array.isArray(entry.reasons) ? entry.reasons.join(", ") : "n/a"}</li>
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">No impact issues.</p>
+                    )}
                   </div>
                 </details>
               ) : null}
