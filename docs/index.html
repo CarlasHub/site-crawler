@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Site Crawler - Overview</title>
+    <title>Cat Crawler - Technical Overview</title>
     <style>
       :root {
         color-scheme: dark;
@@ -190,11 +190,11 @@
   <body>
     <main class="wrap">
       <section class="hero">
-        <span class="tag">Cat Crawler · Drag-to-install bookmarklet</span>
-        <h1>Fast, focused crawling for content teams.</h1>
+        <span class="tag">Cat Crawler · Technical overview · Drag-to-install bookmarklet</span>
+        <h1>Website validation crawler with an in-page bookmarklet runner.</h1>
         <p class="sub">
-          Crawl a site with smart exclusions, language-agnostic limits, redirect tracing, parameter validation, and soft-failure checks. Built for quick QA and clean URL lists.
-          Drag the Cat Crawler button straight to your bookmarks bar, then click it on any site to open the crawler with the current page prefilled.
+          Cat Crawler crawls internal navigation, follows redirects, tests parameter variants, detects soft failures, and groups URL-pattern inconsistencies.
+          Drag the bookmarklet to your bookmarks bar to open the crawler against the page you are currently viewing.
         </p>
         <div class="cta-row">
           <a
@@ -214,99 +214,99 @@
 
       <section class="section grid-2">
         <div class="card">
-          <h3>What it does</h3>
-          <p>Discovers internal URLs from a homepage using sitemap + page links while respecting robots.txt.</p>
+          <h3>Discovery model</h3>
+          <p>Starts from sitemap.xml when available, then traverses internal <code>a[href]</code> links and <code>form[action]</code> routes while respecting robots.txt.</p>
         </div>
         <div class="card">
-          <h3>Why it matters</h3>
-          <p>Keep crawls clean by excluding noisy sections and capping job pages so content QA stays focused.</p>
+          <h3>Validation checks</h3>
+          <p>Classifies navigation into broken URLs, redirect issues, parameter-handling issues, soft failures, and prioritised impact levels.</p>
         </div>
         <div class="card">
-          <h3>What’s new</h3>
-          <p>Draggable and resizable bookmarklet panel, richer audit reports, and cleaner exclusion matching.</p>
+          <h3>Runtime controls</h3>
+          <p>Supports host scoping, path exclusions, language-agnostic path limits, job-page suppression, concurrency control, and optional parameter audit.</p>
         </div>
         <div class="card">
-          <h3>Built-in outputs</h3>
-          <p>Broken links, redirect issues, parameter issues, soft failures, impact analysis, and TXT/CSV export.</p>
+          <h3>Output model</h3>
+          <p>Returns referrer-aware audit entries plus dedicated sections for redirect chains, soft failures, URL patterns, impact analysis, and TXT/CSV export.</p>
         </div>
       </section>
 
       <section id="how" class="section">
-        <h2>How to use the crawler</h2>
+        <h2>Run model</h2>
         <div class="grid-2">
           <div class="step">
             <div class="step-num">1</div>
             <div>
-              <h4>Enter a homepage URL</h4>
-              <p>Use the root page you want to crawl, e.g. <code>https://example.com</code>.</p>
+              <h4>Seed the crawl</h4>
+              <p>Enter the homepage or scoped start path, for example <code>https://example.com</code> or <code>https://example.com/en</code>.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">2</div>
             <div>
-              <h4>Add exclusions</h4>
-              <p>One path per line, like <code>/jobs</code>, <code>/careers</code>, <code>/admin</code>.</p>
+              <h4>Define crawl rules</h4>
+              <p>Add excluded paths and path limits such as <code>/jobs</code>, <code>/careers</code>, or <code>/job</code> max 5.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">3</div>
             <div>
-              <h4>Set path limits</h4>
-              <p>Cap busy sections, e.g. <code>/job</code> max 5 pages.</p>
+              <h4>Choose validators</h4>
+              <p>Enable HTTP status checks and parameter audit when the target site uses query-driven routing or filtered search pages.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">4</div>
             <div>
-              <h4>Choose options</h4>
-              <p>Adjust max pages/concurrency; toggle “Ignore job pages,” “Broken link quick check,” or “Parameter audit.”</p>
+              <h4>Execute the run</h4>
+              <p>The crawler tests each discovered navigation entry, records referrers, follows redirects fully, and classifies the result.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">5</div>
             <div>
-              <h4>Run and export</h4>
-              <p>Click “Run crawl” and download TXT/CSV from Results.</p>
+              <h4>Review the report</h4>
+              <p>Use the validation report, redirect audit, soft-failure audit, pattern audit, and impact analysis before exporting TXT or CSV.</p>
             </div>
           </div>
         </div>
         <div class="note">
-          Tip: enable “Broken link quick check” for live HTTP status codes and “Parameter audit” when you need querystring validation.
+          Recommendation: turn on <code>Broken link quick check</code> for production audits and <code>Parameter audit</code> for search/results routes.
         </div>
       </section>
 
       <section id="bookmarklet" class="section grid-2">
         <div class="card">
           <h3>Bookmarklet setup (Cat Crawler)</h3>
-          <p>Run the crawler inside any page you’re visiting, using a draggable, resizable in-page panel.</p>
+          <p>The bookmarklet injects a floating iframe pointed at the deployed app and passes the current page URL as the seed.</p>
           <ol class="list">
             <li>Drag the <code>Drag Cat Crawler 😼</code> button above to your bookmarks bar.</li>
             <li>Open any page you want to inspect.</li>
-            <li>Click the saved Cat Crawler bookmark to open the crawler with the current URL prefilled.</li>
-            <li>Drag the header to move it, then resize from any corner.</li>
+            <li>Click the saved bookmark to load the latest <code>bookmarklet.js</code> from GitHub Pages.</li>
+            <li>Drag the header to move the panel and resize it from any of the four corners.</li>
           </ol>
         </div>
         <div class="card">
-          <h3>Quality checklist</h3>
-          <p>Use this to keep runs consistent across teams:</p>
+          <h3>Audit scope checklist</h3>
+          <p>Use this before exporting or sharing results:</p>
           <ul class="list">
-            <li>Confirm sitemap available and robots.txt respected</li>
-            <li>Exclude careers/job sections unless needed</li>
-            <li>Cap pagination-heavy paths</li>
-            <li>Check redirect issues, soft failures, and impact ranking before export</li>
-            <li>Export CSV and share with stakeholders</li>
+            <li>Confirm sitemap and robots.txt were reachable</li>
+            <li>Check whether excluded sections and path limits hid expected routes</li>
+            <li>Review redirect chains for loops, multiple hops, and dropped parameters</li>
+            <li>Review soft failures on 200 responses before treating them as valid</li>
+            <li>Use impact analysis to prioritise repeated or core-flow issues</li>
           </ul>
         </div>
       </section>
 
       <section class="section grid-2">
         <div class="card">
-          <h3>Results you can trust</h3>
-          <p>Each entry includes source, referrer, final destination, status, and classification across broken, redirect, parameter, and soft-failure checks.</p>
+          <h3>Response sections</h3>
+          <p><code>issueReport</code>, <code>audit</code>, <code>redirectAudit</code>, <code>softFailureAudit</code>, <code>patternAudit</code>, <code>parameterAudit</code>, and <code>impactAudit</code>.</p>
         </div>
         <div class="card">
-          <h3>Team-friendly presets</h3>
-          <p>Save configurations per client, export to JSON, and re-use full audit setups for future validations.</p>
+          <h3>Bookmarklet update model</h3>
+          <p>The installed bookmark loads the current script from GitHub Pages, so bookmarklet behavior can be updated without replacing the saved bookmark again.</p>
         </div>
       </section>
 
