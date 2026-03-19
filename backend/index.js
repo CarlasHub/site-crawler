@@ -26,7 +26,8 @@ const DEFAULTS = {
   ],
   ignoreJobPages: true,
   brokenLinkCheck: false,
-  parameterAudit: false
+  parameterAudit: false,
+  patternMatchFilter: ""
 };
 
 const PARAMETER_VARIATIONS = [
@@ -804,6 +805,210 @@ function summarizeSoftFailureAudit(entries) {
   });
 }
 
+function tokenizeSegment(segment) {
+  return String(segment || "")
+    .toLowerCase()
+    .split(/[-_]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function classifySegmentShape(segment) {
+  const value = String(segment || "");
+  if (!value) return "{empty}";
+  if (/^\d+$/.test(value)) return "{num}";
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value)) return "{uuid}";
+  if (/^\d{4}-\d{2}-\d{2}$/i.test(value)) return "{date}";
+  if (/^\d{4}\/\d{2}\/\d{2}$/i.test(value)) return "{date}";
+  if (/^[A-Z0-9]{6,}$/.test(value)) return "{id}";
+  if (/^\d[\d-]*$/.test(value)) return "{numlike}";
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)+$/i.test(value)) return "{slug}";
+  if (/^[a-z0-9]+(?:_[a-z0-9]+)+$/i.test(value)) return "{snake}";
+  if (/[A-Z]/.test(value) && /[a-z]/.test(value)) return "{camel}";
+  return value.toLowerCase();
+}
+
+function getUrlPatternSignature(urlString) {
+  try {
+    const u = new URL(urlString);
+    const segments = u.pathname.split("/").filter(Boolean).map(classifySegmentShape);
+    const queryKeys = Array.from(u.searchParams.keys()).sort();
+    const queryPart = queryKeys.length ? `?${queryKeys.join("&")}` : "";
+    return `${u.origin}/${segments.join("/")}${queryPart}`;
+  } catch {
+    return urlString;
+  }
+}
+
+function getUrlLeafKey(urlString) {
+  try {
+    const u = new URL(urlString);
+    const segments = u.pathname.split("/").filter(Boolean);
+    const leaf = String(segments[segments.length - 1] || "").toLowerCase();
+    return classifySegmentShape(leaf);
+  } catch {
+    return "";
+  }
+}
+
+function getUrlPathTokens(urlString) {
+  try {
+    const u = new URL(urlString);
+    return u.pathname
+      .split("/")
+      .filter(Boolean)
+      .flatMap((segment) => tokenizeSegment(segment))
+      .filter((token) => !/^\d+$/.test(token));
+  } catch {
+    return [];
+  }
+}
+
+function getNamingStyle(segment) {
+  const value = String(segment || "");
+  if (!value) return "plain";
+  if (value.includes("_")) return "snake_case";
+  if (value.includes("-")) return "kebab-case";
+  if (/[A-Z]/.test(value) && /[a-z]/.test(value)) return "camel-or-mixed-case";
+  if (value !== value.toLowerCase()) return "mixed-case";
+  return "plain";
+}
+
+function normalizeParentPath(urlString) {
+  try {
+    const u = new URL(urlString);
+    const parts = u.pathname.split("/").filter(Boolean);
+    const parent = parts.slice(0, -1).join("/");
+    return `${u.origin}/${parent}`;
+  } catch {
+    return urlString;
+  }
+}
+
+function matchesPatternFilter(urlString, filterValue) {
+  const filter = String(filterValue || "").trim().toLowerCase();
+  if (!filter) return true;
+  return String(urlString || "").toLowerCase().includes(filter);
+}
+
+function summarizePatternAudit(data) {
+  return {
+    totalUrls: data.totalUrls,
+    filteredUrls: data.filteredUrls,
+    patternGroups: data.patternGroups.length,
+    duplicatePatterns: data.duplicatePatterns.length,
+    legacyVsCurrent: data.legacyVsCurrent.length,
+    inconsistentNaming: data.inconsistentNaming.length,
+    filterApplied: data.filterApplied
+  };
+}
+
+function buildPatternAudit(records, filterValue) {
+  const source = Array.isArray(records) ? records : [];
+  const filterApplied = String(filterValue || "").trim();
+  const filteredRecords = source.filter((record) => {
+    const original = record?.url || record?.originalUrl || "";
+    const finalUrl = record?.finalUrl || record?.finalResolvedUrl || "";
+    return matchesPatternFilter(original, filterApplied) || matchesPatternFilter(finalUrl, filterApplied);
+  });
+
+  const patternMap = new Map();
+  const parentMap = new Map();
+  const leafMap = new Map();
+
+  for (const record of filteredRecords) {
+    const url = record.url || record.originalUrl || "";
+    const pattern = getUrlPatternSignature(url);
+    const patternEntry = patternMap.get(pattern) || { pattern, urls: [] };
+    patternEntry.urls.push(url);
+    patternMap.set(pattern, patternEntry);
+
+    const parent = normalizeParentPath(url);
+    const u = new URL(url);
+    const parts = u.pathname.split("/").filter(Boolean);
+    const leaf = String(parts[parts.length - 1] || "");
+    const siblingEntry = parentMap.get(parent) || { parentPath: parent, children: [] };
+    siblingEntry.children.push({
+      url,
+      leaf,
+      style: getNamingStyle(leaf),
+      hasMixedCase: leaf !== leaf.toLowerCase(),
+      hasUnderscore: leaf.includes("_"),
+      hasHyphen: leaf.includes("-")
+    });
+    parentMap.set(parent, siblingEntry);
+
+    const leafKey = getUrlLeafKey(url);
+    const tokens = getUrlPathTokens(url);
+    const legacy = tokens.some((token) => ["old", "legacy", "archive", "deprecated", "v1"].includes(token));
+    const current = tokens.some((token) => ["new", "current", "latest", "modern", "v2"].includes(token));
+    const leafEntry = leafMap.get(leafKey) || { leafKey, items: [] };
+    leafEntry.items.push({ url, tokens, legacy, current });
+    leafMap.set(leafKey, leafEntry);
+  }
+
+  const patternGroups = Array.from(patternMap.values())
+    .map((entry) => ({
+      pattern: entry.pattern,
+      count: entry.urls.length,
+      sampleUrls: uniqueStrings(entry.urls).slice(0, 6)
+    }))
+    .sort((a, b) => b.count - a.count || a.pattern.localeCompare(b.pattern));
+
+  const duplicatePatterns = patternGroups
+    .filter((entry) => entry.count > 1)
+    .map((entry) => ({
+      pattern: entry.pattern,
+      count: entry.count,
+      sampleUrls: entry.sampleUrls
+    }));
+
+  const legacyVsCurrent = Array.from(leafMap.values())
+    .map((entry) => {
+      const legacyUrls = uniqueStrings(entry.items.filter((item) => item.legacy).map((item) => item.url));
+      const currentUrls = uniqueStrings(entry.items.filter((item) => item.current || !item.legacy).map((item) => item.url));
+      if (!legacyUrls.length || !currentUrls.length) return null;
+      return {
+        key: entry.leafKey,
+        legacyUrls: legacyUrls.slice(0, 4),
+        currentUrls: currentUrls.filter((url) => !legacyUrls.includes(url)).slice(0, 4)
+      };
+    })
+    .filter((entry) => entry && entry.currentUrls.length > 0);
+
+  const inconsistentNaming = Array.from(parentMap.values())
+    .map((entry) => {
+      const styles = uniqueStrings(entry.children.map((child) => child.style));
+      const mixedCases = entry.children.some((child) => child.hasMixedCase);
+      const mixedSeparators = entry.children.some((child) => child.hasHyphen) && entry.children.some((child) => child.hasUnderscore);
+      if (styles.length <= 1 && !mixedCases && !mixedSeparators) return null;
+      return {
+        parentPath: entry.parentPath,
+        styles,
+        mixedCase: mixedCases,
+        mixedSeparators,
+        sampleUrls: uniqueStrings(entry.children.map((child) => child.url)).slice(0, 6)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.parentPath.localeCompare(b.parentPath));
+
+  const result = {
+    filterApplied,
+    totalUrls: source.length,
+    filteredUrls: filteredRecords.length,
+    patternGroups,
+    duplicatePatterns,
+    legacyVsCurrent,
+    inconsistentNaming
+  };
+
+  return {
+    summary: summarizePatternAudit(result),
+    ...result
+  };
+}
+
 function concurrencyMap(items, limit, fn) {
   return new Promise((resolve) => {
     const results = new Array(items.length);
@@ -845,6 +1050,7 @@ app.post("/api/crawl", async (req, res) => {
   const url = String(req.body?.url || "").trim();
   const options = { ...DEFAULTS, ...(req.body?.options || {}) };
   delete options.languagePrefixes;
+  options.patternMatchFilter = String(options.patternMatchFilter || "").trim();
   options.pathLimits = sanitizePathLimits(options.pathLimits);
   const excludePathMatchers = buildExcludeMatchers(options.excludePaths);
   const userAgent = "SiteCrawler/1.0";
@@ -1265,6 +1471,7 @@ app.post("/api/crawl", async (req, res) => {
     .sort((a, b) => a.url.localeCompare(b.url));
 
   const softFailureSummary = summarizeSoftFailureAudit(softFailureEntries);
+  const patternAudit = buildPatternAudit(out, options.patternMatchFilter);
 
   let parameterAudit = {
     summary: {
@@ -1365,6 +1572,7 @@ app.post("/api/crawl", async (req, res) => {
       summary: softFailureSummary,
       entries: softFailureEntries
     },
+    patternAudit,
     parameterAudit
   });
 });

@@ -143,6 +143,7 @@ export default function App() {
       setBrokenLinkCheck(!!last.brokenLinkCheck);
       setParameterAudit(!!last.parameterAudit);
       setPresetName(last.presetName || "default");
+      setUrlMatchPattern(last.urlMatchPattern || "");
     }
   }, []);
 
@@ -175,10 +176,11 @@ export default function App() {
         ignoreJobPages,
         brokenLinkCheck,
         parameterAudit,
-        presetName
+        presetName,
+        urlMatchPattern
       })
     );
-  }, [url, excludePaths, pathLimits, maxPages, concurrency, includeQuery, ignoreJobPages, brokenLinkCheck, parameterAudit, presetName]);
+  }, [url, excludePaths, pathLimits, maxPages, concurrency, includeQuery, ignoreJobPages, brokenLinkCheck, parameterAudit, presetName, urlMatchPattern]);
 
   useEffect(() => {
     if (!loading) {
@@ -212,6 +214,8 @@ export default function App() {
   const redirectAuditSummary = data?.redirectAudit?.summary || null;
   const softFailureEntries = data?.softFailureAudit?.entries || [];
   const softFailureSummary = data?.softFailureAudit?.summary || null;
+  const patternAudit = data?.patternAudit || null;
+  const patternAuditSummary = data?.patternAudit?.summary || null;
   const parameterAuditEntries = data?.parameterAudit?.entries || [];
   const parameterAuditSummary = data?.parameterAudit?.summary || null;
 
@@ -283,7 +287,8 @@ export default function App() {
         includeQuery,
         ignoreJobPages,
         brokenLinkCheck,
-        parameterAudit
+        parameterAudit,
+        urlMatchPattern
       }
     };
 
@@ -314,6 +319,7 @@ export default function App() {
     setIgnoreJobPages(p.settings.ignoreJobPages !== false);
     setBrokenLinkCheck(!!p.settings.brokenLinkCheck);
     setParameterAudit(!!p.settings.parameterAudit);
+    setUrlMatchPattern(p.settings.urlMatchPattern || "");
     setError("");
   }
 
@@ -374,7 +380,8 @@ export default function App() {
             includeQuery,
             ignoreJobPages,
             brokenLinkCheck,
-            parameterAudit
+            parameterAudit,
+            patternMatchFilter: urlMatchPattern.trim()
           }
         })
       });
@@ -933,6 +940,8 @@ export default function App() {
                 {redirectAuditSummary ? <span className="chip">Multi-hop {redirectAuditSummary.multipleHops}</span> : null}
                 {redirectAuditSummary ? <span className="chip">Params lost {redirectAuditSummary.paramsLost}</span> : null}
                 {softFailureSummary ? <span className="chip">API failures {softFailureSummary.apiFailures}</span> : null}
+                {patternAuditSummary ? <span className="chip">Pattern groups {patternAuditSummary.patternGroups}</span> : null}
+                {patternAuditSummary ? <span className="chip">Naming issues {patternAuditSummary.inconsistentNaming}</span> : null}
               </div>
             </div>
 
@@ -1047,6 +1056,81 @@ export default function App() {
                     )}
                     {softFailureEntries.length > 80 ? (
                       <p className="muted">Showing first 80 soft failures.</p>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+
+              {patternAuditSummary ? (
+                <details className="details" open={(patternAuditSummary.duplicatePatterns + patternAuditSummary.legacyVsCurrent + patternAuditSummary.inconsistentNaming) > 0}>
+                  <summary>
+                    URL patterns
+                    {` (${patternAuditSummary.patternGroups} groups)`}
+                  </summary>
+                  <div className="dupes">
+                    <p className="help">
+                      Checked {patternAuditSummary.filteredUrls} URLs{patternAuditSummary.filterApplied ? ` matching "${patternAuditSummary.filterApplied}"` : ""}. Duplicate patterns {patternAuditSummary.duplicatePatterns}, legacy vs current paths {patternAuditSummary.legacyVsCurrent}, inconsistent naming groups {patternAuditSummary.inconsistentNaming}.
+                    </p>
+
+                    {patternAudit?.duplicatePatterns?.length ? (
+                      <>
+                        <p className="help"><strong>Duplicate patterns</strong></p>
+                        {patternAudit.duplicatePatterns.slice(0, 20).map((entry) => (
+                          <div key={`dup-${entry.pattern}`} className="dupeGroup">
+                            <div className="dupeHead">
+                              <div className="dupeBase">{entry.pattern}</div>
+                              <div className="dupeFlags">
+                                <span className="flag">count {entry.count}</span>
+                              </div>
+                            </div>
+                            <ul className="dupeList">
+                              {entry.sampleUrls.map((url) => <li key={url}>{url}</li>)}
+                            </ul>
+                          </div>
+                        ))}
+                      </>
+                    ) : null}
+
+                    {patternAudit?.legacyVsCurrent?.length ? (
+                      <>
+                        <p className="help"><strong>Legacy vs current</strong></p>
+                        {patternAudit.legacyVsCurrent.slice(0, 20).map((entry) => (
+                          <div key={`legacy-${entry.key}`} className="dupeGroup">
+                            <div className="dupeHead">
+                              <div className="dupeBase">{entry.key}</div>
+                            </div>
+                            <ul className="dupeList">
+                              <li>Legacy: {entry.legacyUrls.join(" | ")}</li>
+                              <li>Current: {entry.currentUrls.join(" | ")}</li>
+                            </ul>
+                          </div>
+                        ))}
+                      </>
+                    ) : null}
+
+                    {patternAudit?.inconsistentNaming?.length ? (
+                      <>
+                        <p className="help"><strong>Inconsistent naming</strong></p>
+                        {patternAudit.inconsistentNaming.slice(0, 20).map((entry) => (
+                          <div key={`name-${entry.parentPath}`} className="dupeGroup">
+                            <div className="dupeHead">
+                              <div className="dupeBase">{entry.parentPath}</div>
+                              <div className="dupeFlags">
+                                {entry.styles.map((style) => <span key={style} className="flag">{style}</span>)}
+                                {entry.mixedCase ? <span className="flag">mixed case</span> : null}
+                                {entry.mixedSeparators ? <span className="flag">mixed separators</span> : null}
+                              </div>
+                            </div>
+                            <ul className="dupeList">
+                              {entry.sampleUrls.map((url) => <li key={url}>{url}</li>)}
+                            </ul>
+                          </div>
+                        ))}
+                      </>
+                    ) : null}
+
+                    {!patternAudit?.duplicatePatterns?.length && !patternAudit?.legacyVsCurrent?.length && !patternAudit?.inconsistentNaming?.length ? (
+                      <p className="muted">No structural URL inconsistencies detected.</p>
                     ) : null}
                   </div>
                 </details>
