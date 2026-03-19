@@ -75,6 +75,12 @@
         margin-top: 18px;
       }
 
+      .drag-note {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
       .btn {
         padding: 10px 16px;
         border-radius: 10px;
@@ -184,11 +190,11 @@
   <body>
     <main class="wrap">
       <section class="hero">
-        <span class="tag">Cat Crawler · Self-host required</span>
+        <span class="tag">Cat Crawler · Drag-to-install bookmarklet</span>
         <h1>Fast, focused crawling for content teams.</h1>
         <p class="sub">
           Crawl a site with smart exclusions, language-agnostic limits, and optional broken-link checks. Built for quick QA and clean URL lists.
-          This demo points to a personal Cloud Run host — use your own deployment URL to run it in production.
+          Drag the Cat Crawler button straight to your bookmarks bar, then click it on any site to open the crawler with the current page prefilled.
         </p>
         <div class="cta-row">
           <a
@@ -199,10 +205,11 @@
             title="Drag to bookmarks bar"
             aria-label="Cat Crawler bookmarklet. Drag to bookmarks bar."
           >
-            Cat Crawler 😼
+            Drag Cat Crawler 😼
           </a>
-          <a class="btn btn-ghost" href="#how">How to use</a>
+          <a class="btn btn-ghost" href="#bookmarklet">Bookmarklet setup</a>
         </div>
+        <div class="drag-note">Tip: if your bookmarks bar is hidden, press <code>Cmd</code> + <code>Shift</code> + <code>B</code> in Chrome.</div>
       </section>
 
       <section class="section grid-2">
@@ -216,7 +223,7 @@
         </div>
         <div class="card">
           <h3>What’s new</h3>
-          <p>Bookmarklet mode (“Cat Crawler”), faster queueing, and cleaner exclusion matching.</p>
+          <p>Drag-and-drop bookmarklet install, instant launch on the current page, and cleaner exclusion matching.</p>
         </div>
         <div class="card">
           <h3>Built-in outputs</h3>
@@ -273,9 +280,9 @@
           <h3>Bookmarklet setup (Cat Crawler)</h3>
           <p>Run the crawler inside any page you’re visiting, using a floating in-page panel.</p>
           <ol class="list">
-            <li>Open <code>docs/bookmarklet.js</code> and set <code>APP_ORIGIN</code> to your deployed app URL.</li>
-            <li>Create a new browser bookmark and paste the file contents as the URL (prefix with <code>javascript:</code>).</li>
-            <li>Click the bookmark on any site to open Cat Crawler with the current URL prefilled.</li>
+            <li>Drag the <code>Drag Cat Crawler 😼</code> button above to your bookmarks bar.</li>
+            <li>Open any page you want to inspect.</li>
+            <li>Click the saved Cat Crawler bookmark to open the crawler with the current URL prefilled.</li>
           </ol>
         </div>
         <div class="card">

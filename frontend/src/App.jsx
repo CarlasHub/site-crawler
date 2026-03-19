@@ -72,6 +72,11 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+function wildcardToRegExp(pattern) {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  return new RegExp(escaped, "i");
+}
+
 export default function App() {
   const [url, setUrl] = useState("");
   const [excludePaths, setExcludePaths] = useState("/jobs\n/careers\n/apply\n/login\n/admin");
@@ -90,15 +95,11 @@ export default function App() {
   const [notices, setNotices] = useState([]);
   const [data, setData] = useState(null);
 
-  const [pinRequired, setPinRequired] = useState(false);
-  const [pin, setPin] = useState("");
-  const [runnerPin, setRunnerPin] = useState("");
-  const [isUnlocked, setIsUnlocked] = useState(false);
-
   const [presets, setPresets] = useState([]);
   const [presetName, setPresetName] = useState("default");
   const fileInputRef = useRef(null);
   const [isBookmarklet, setIsBookmarklet] = useState(false);
+  const [urlMatchPattern, setUrlMatchPattern] = useState("");
 
   useEffect(() => {
     const stored = safeJsonParse(localStorage.getItem(STORAGE_KEY), []);
@@ -132,71 +133,6 @@ export default function App() {
     if (targetUrl) {
       setUrl(targetUrl);
     }
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-    fetch("/api/config")
-      .then((r) => r.json())
-      .then((json) => {
-        if (!isMounted) return;
-        const required = !!json?.pinRequired;
-        setPinRequired(required);
-
-        if (!required) {
-          setIsUnlocked(true);
-          setPin("");
-          setRunnerPin("");
-          return;
-        }
-
-        const storedPin = sessionStorage.getItem("siteCrawlerRunnerPin") || "";
-        if (!storedPin) {
-          setIsUnlocked(false);
-          setRunnerPin("");
-          return;
-        }
-
-        setRunnerPin(storedPin);
-
-        return fetch("/api/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pin: storedPin })
-        })
-          .then((r) => {
-            if (!r.ok) throw new Error("Invalid pin");
-            return r.json();
-          })
-          .then((auth) => {
-            if (!isMounted) return;
-            if (auth?.ok) {
-              setIsUnlocked(true);
-              setPin("");
-            } else {
-              sessionStorage.removeItem("siteCrawlerRunnerPin");
-              setIsUnlocked(false);
-              setRunnerPin("");
-            }
-          })
-          .catch(() => {
-            if (!isMounted) return;
-            sessionStorage.removeItem("siteCrawlerRunnerPin");
-            setIsUnlocked(false);
-            setRunnerPin("");
-          });
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setPinRequired(false);
-        setIsUnlocked(true);
-        setPin("");
-        setRunnerPin("");
-      });
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -243,9 +179,26 @@ export default function App() {
 
   const urls = data?.urls || [];
 
+  const matchedUrls = useMemo(() => {
+    const pattern = urlMatchPattern.trim();
+    if (!pattern) return urls;
+
+    const lowerPattern = pattern.toLowerCase();
+    const matcher = pattern.includes("*") ? wildcardToRegExp(pattern) : null;
+
+    return urls.filter((row) => {
+      const original = String(row?.url || "");
+      const finalUrl = String(row?.finalUrl || "");
+      if (matcher) {
+        return matcher.test(original) || matcher.test(finalUrl);
+      }
+      return original.toLowerCase().includes(lowerPattern) || finalUrl.toLowerCase().includes(lowerPattern);
+    });
+  }, [urlMatchPattern, urls]);
+
   const duplicateCandidates = useMemo(() => {
     const byBase = new Map();
-    for (const row of urls) {
+    for (const row of matchedUrls) {
       const original = row.url;
       const base = baseWithoutQuery(original);
       const entry = byBase.get(base) || { base, variants: [], hasQueryVariants: false, hasLangVariants: false };
@@ -257,7 +210,7 @@ export default function App() {
     const groups = Array.from(byBase.values()).filter((g) => g.variants.length > 1 || g.hasQueryVariants || g.hasLangVariants);
     groups.sort((a, b) => b.variants.length - a.variants.length);
     return groups;
-  }, [urls]);
+  }, [matchedUrls]);
 
   const sanitizedPathLimits = useMemo(() => {
     const cleaned = Array.isArray(pathLimits) ? pathLimits : [];
@@ -275,56 +228,6 @@ export default function App() {
     const cleanMessage = String(message || "").trim();
     if (!cleanMessage) return;
     setNotices((prev) => [{ id: makeId(), type: cleanType, message: cleanMessage }, ...prev].slice(0, 4));
-  }
-
-  async function unlockRunner() {
-    setError("");
-    setNotices([]);
-
-    if (!pinRequired) {
-      setIsUnlocked(true);
-      setPin("");
-      setRunnerPin("");
-      pushNotice("success", "Runner access is already open.");
-      return;
-    }
-
-    const trimmedPin = pin.trim();
-    if (!trimmedPin) {
-      setError("Pin is required.");
-      pushNotice("error", "Enter a pin to unlock the runner.");
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin: trimmedPin })
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json?.ok) {
-        const msg = json?.error || "Invalid pin";
-        setError(msg);
-        setIsUnlocked(false);
-        setRunnerPin("");
-        sessionStorage.removeItem("siteCrawlerRunnerPin");
-        pushNotice("error", msg);
-        return;
-      }
-
-      sessionStorage.setItem("siteCrawlerRunnerPin", trimmedPin);
-      setRunnerPin(trimmedPin);
-      setIsUnlocked(true);
-      setPin("");
-      pushNotice("success", "Runner unlocked.");
-    } catch {
-      setError("Network error");
-      setIsUnlocked(false);
-      setRunnerPin("");
-      pushNotice("error", "Network error while unlocking the runner.");
-    }
   }
 
   function savePreset() {
@@ -406,12 +309,6 @@ export default function App() {
     setData(null);
     setNotices([]);
 
-    if (pinRequired && !isUnlocked) {
-      setError("Runner is locked. Unlock the runner to start a crawl.");
-      pushNotice("error", "Runner is locked. Unlock it first.");
-      return;
-    }
-
     const trimmed = url.trim();
     if (!trimmed) {
       setError("Homepage URL is required.");
@@ -426,12 +323,9 @@ export default function App() {
 
     setLoading(true);
     try {
-      const headers = { "Content-Type": "application/json" };
-      if (pinRequired) headers["x-runner-pin"] = runnerPin.trim();
-
       const res = await fetch("/api/crawl", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: trimmed,
           options: {
@@ -465,15 +359,15 @@ export default function App() {
   }
 
   function downloadUrls() {
-    if (!urls.length) return;
-    const lines = urls.map((r) => r.url);
+    if (!matchedUrls.length) return;
+    const lines = matchedUrls.map((r) => r.url);
     downloadText("crawl-urls.txt", lines.join("\n"));
   }
 
   function downloadCsv() {
-    if (!urls.length) return;
+    if (!matchedUrls.length) return;
     const header = ["url", "finalUrl", "status", "blockedByRobots"].join(",");
-    const rows = urls.map((r) => {
+    const rows = matchedUrls.map((r) => {
       const values = [
         JSON.stringify(r.url || ""),
         JSON.stringify(r.finalUrl || ""),
@@ -526,7 +420,6 @@ export default function App() {
 
           <nav className="nav" aria-label="Primary">
             <a className="navPill" href="#howto">How to use</a>
-            <a className="navPill" href="#access">Access</a>
             <a className="navPill" href="#runner">Runner</a>
             <a className="navPill" href="#presets">Presets</a>
             <a className="navPill" href="#results">Results</a>
@@ -650,46 +543,6 @@ export default function App() {
             </div>
           </section>
 
-          <section id="access" className="panel" aria-labelledby="accessTitle">
-              <div className="panelHead">
-                <h2 id="accessTitle">Access control</h2>
-                <div className="panelMeta">
-                  <span className="chip">
-                    {pinRequired ? (isUnlocked ? "Unlocked" : "Locked") : "Open"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="panelBody">
-                <h3 className="panelSubTitle">Enter your pin to access the runner access control</h3>
-                <p className="help">
-                  If a pin is configured on the server, you must unlock the runner before you can start a crawl. If no pin is configured, the runner is open.
-                </p>
-
-                <div className="formGrid">
-                  <div className="field">
-                    <label htmlFor="pin">Pin</label>
-                    <input
-                      id="pin"
-                      type="password"
-                      inputMode="text"
-                      autoComplete="off"
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value)}
-                      placeholder={pinRequired ? "Enter pin" : "No pin required"}
-                      disabled={!pinRequired || isUnlocked}
-                    />
-                  </div>
-
-                  <div className="actions">
-                    <button className="btnPrimary" type="button" onClick={unlockRunner} disabled={!pinRequired || isUnlocked}>
-                      {pinRequired ? (isUnlocked ? "Runner unlocked" : "Unlock runner") : "Runner open"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </section>
-
           <section id="runner" className="panel" aria-labelledby="runnerTitle">
             <div className="panelHead">
               <h2 id="runnerTitle">Runner</h2>
@@ -698,6 +551,7 @@ export default function App() {
                   <>
                     <span className="chip">Visited {summary.visited}</span>
                     <span className="chip">Returned {summary.total}</span>
+                    <span className="chip">Matched {matchedUrls.length}</span>
                     <span className="chip">Redirects {summary.redirects}</span>
                     <span className="chip">Broken {summary.broken}</span>
                     {summary.skippedByPathLimit ? <span className="chip">Capped {summary.skippedByPathLimit}</span> : null}
@@ -804,6 +658,19 @@ export default function App() {
                 <p className="help">Caps how many pages are crawled for specific sections. Example: /job max 5 means only 5 pages under /job are crawled. Rules are language agnostic, so /job also matches /en/job, /fr/job, and similar.</p>
               </div>
 
+              <div className="field">
+                <label htmlFor="urlMatchPattern">URL match filter</label>
+                <input
+                  id="urlMatchPattern"
+                  type="text"
+                  placeholder="/jobs-zoeken*"
+                  value={urlMatchPattern}
+                  onChange={(e) => setUrlMatchPattern(e.target.value)}
+                  autoComplete="off"
+                />
+                <p className="help">Optional. Filters results after crawling. Supports simple wildcard matching with `*`, for example `/jobs-zoeken*`.</p>
+              </div>
+
               <div className="fieldRow">
                 <div className="field">
                   <label htmlFor="maxPages">Max pages</label>
@@ -860,13 +727,13 @@ export default function App() {
               </div>
 
               <div className="actions">
-                <button className="btnPrimary" type="button" onClick={runCrawl} disabled={loading || (pinRequired && !isUnlocked)}>
+                <button className="btnPrimary" type="button" onClick={runCrawl} disabled={loading}>
                   {loading ? "Crawling" : "Run crawl"}
                 </button>
-                <button className="btnGhost" type="button" onClick={downloadUrls} disabled={!urls.length}>
+                <button className="btnGhost" type="button" onClick={downloadUrls} disabled={!matchedUrls.length}>
                   Download TXT
                 </button>
-                <button className="btnGhost" type="button" onClick={downloadCsv} disabled={!urls.length}>
+                <button className="btnGhost" type="button" onClick={downloadCsv} disabled={!matchedUrls.length}>
                   Download CSV
                 </button>
               </div>
@@ -966,13 +833,16 @@ export default function App() {
                 <textarea
                   id="urls"
                   readOnly
-                  value={urls.map((u) => {
+                  value={matchedUrls.map((u) => {
                     const statusPart = u.status !== null && u.status !== undefined && u.status !== "" ? ` [${u.status}]` : "";
                     const redirectPart = u.finalUrl && u.finalUrl !== u.url ? ` -> ${u.finalUrl}` : "";
                     return `${u.url}${statusPart}${redirectPart}`;
                   }).join("\n")}
                   rows={14}
                 />
+                <p className="help">
+                  Showing {matchedUrls.length} of {urls.length} crawled URLs.
+                </p>
               </div>
 
               <details className="details">

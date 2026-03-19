@@ -7,8 +7,6 @@ import { fileURLToPath } from "url";
 const app = express();
 app.use(express.json({ limit: "1mb" }));
 
-const RUNNER_PIN = String(process.env.RUNNER_PIN || "").trim();
-
 const DEFAULTS = {
   maxPages: 300,
   concurrency: 6,
@@ -341,26 +339,14 @@ function concurrencyMap(items, limit, fn) {
 }
 
 app.get("/api/config", (req, res) => {
-  return res.json({ pinRequired: !!RUNNER_PIN });
+  return res.json({ pinRequired: false });
 });
 
 app.post("/api/auth", (req, res) => {
-  if (!RUNNER_PIN) return res.json({ ok: true, pinRequired: false });
-  const pin = String(req.body?.pin || "").trim();
-  if (pin && pin === RUNNER_PIN) {
-    return res.json({ ok: true, pinRequired: true });
-  }
-  return res.status(401).json({ ok: false, pinRequired: true, error: "Invalid pin" });
+  return res.json({ ok: true, pinRequired: false });
 });
 
 app.post("/api/crawl", async (req, res) => {
-  if (RUNNER_PIN) {
-    const provided = String(req.get("x-runner-pin") || "").trim();
-    if (!provided || provided !== RUNNER_PIN) {
-      return res.status(401).json({ error: "Runner is locked. Enter a valid pin to run the crawl." });
-    }
-  }
-
   const url = String(req.body?.url || "").trim();
   const options = { ...DEFAULTS, ...(req.body?.options || {}) };
   delete options.languagePrefixes;

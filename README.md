@@ -1,6 +1,6 @@
 # Cat Crawler
 
-> Discover internal URLs with exclusions, redirects, duplicates, presets, language-agnostic path limits, and optional access control.
+> Discover internal URLs with exclusions, redirects, duplicates, presets, and language-agnostic path limits.
 
 ![UI screenshot](docs/screenshot.png)
 
@@ -37,7 +37,6 @@
 - Optional broken link quick check with HTTP status recording
 - Duplicate content candidates detection, including querystring and language variants
 - Client presets saved in localStorage, export and import presets as JSON
-- Optional runner access control via server-side pin
 - Glass UI with progress ring and animated orb during crawl
 
 ---
@@ -81,9 +80,8 @@ For production use, deploy to **your own** Cloud Run service and update `APP_ORI
 3. Define crawl limits by path if required.
 4. Configure max pages and concurrency.
 5. Choose options such as ignoring job pages or running a broken link check.
-6. Unlock the runner if access control is enabled.
-7. Run the crawl.
-8. Review results and export TXT or CSV if needed.
+6. Run the crawl.
+7. Review results and export TXT or CSV if needed.
 
 ### Quick start (step-by-step)
 1. Paste the site homepage in **Homepage URL** (e.g. `https://example.com`).
@@ -97,15 +95,6 @@ Tip: if you enable **Broken link quick check**, you can filter status codes to s
 
 ### Landing page
 See a marketing-style overview at `docs/landing.html` (matches the in-app color scheme).
-
-### Access control
-- The frontend checks if a pin is required via `GET /api/config`.
-- If enabled, the user must unlock the runner using `POST /api/auth`.
-- The pin is never exposed client-side beyond the request and is cleared from the input on success.
-- Crawl requests send the pin via the `x-runner-pin` header.
-- The backend rejects crawl requests with HTTP 401 if the pin is missing or invalid.
-
----
 
 ## Architecture diagram
 
@@ -187,8 +176,8 @@ Request body:
 
 Use the crawler on the page you are currently visiting.
 
-1. Open `docs/bookmarklet.js` and set `APP_ORIGIN` to your deployed app URL.
-2. Create a new browser bookmark and paste the file contents as the URL (prefix with `javascript:`).
+1. Open the GitHub Pages landing page in `docs/index.html`.
+2. Drag the **Cat Crawler** bookmarklet button to your bookmarks bar.
 3. Click the bookmark on any site to open **Cat Crawler**. It auto-fills the current page URL.
 
 Tip: The landing page button **Cat Crawler 😼** is a live bookmarklet link, so you can drag it to your bookmarks bar to install the latest script.
