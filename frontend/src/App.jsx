@@ -92,6 +92,41 @@ function makeEmptyProgress() {
   };
 }
 
+async function readJsonResponse(res) {
+  const text = await res.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const preview = text.slice(0, 160).replace(/\s+/g, " ").trim();
+    throw new Error(preview ? `Unexpected response: ${preview}` : "Unexpected empty response");
+  }
+}
+
+async function fetchJsonWithRetry(input, init, { attempts = 1, retryDelayMs = 500, retryStatuses = [502, 503, 504] } = {}) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const res = await fetch(input, init);
+      if (retryStatuses.includes(Number(res.status || 0)) && attempt < attempts) {
+        await sleep(retryDelayMs);
+        continue;
+      }
+
+      const json = await readJsonResponse(res);
+      return { res, json };
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts) break;
+      await sleep(retryDelayMs);
+    }
+  }
+
+  throw lastError || new Error("Request failed");
+}
+
 function getEntryOriginalUrl(row) {
   return String(row?.originalUrl || row?.url || "");
 }
@@ -398,26 +433,29 @@ export default function App() {
     });
 
     try {
-      const res = await fetch("/api/crawl/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: trimmed,
-          options: {
-            excludePaths: excludePathList,
-            pathLimits: sanitizedPathLimits,
-            maxPages: clamp(Number(maxPages || 300), 10, 5000),
-            concurrency: clamp(Number(concurrency || 6), 1, 20),
-            includeQuery,
-            ignoreJobPages,
-            brokenLinkCheck,
-            parameterAudit,
-            patternMatchFilter: urlMatchPattern.trim()
-          }
-        })
-      });
+      const { res, json } = await fetchJsonWithRetry(
+        "/api/crawl/start",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: trimmed,
+            options: {
+              excludePaths: excludePathList,
+              pathLimits: sanitizedPathLimits,
+              maxPages: clamp(Number(maxPages || 300), 10, 5000),
+              concurrency: clamp(Number(concurrency || 6), 1, 20),
+              includeQuery,
+              ignoreJobPages,
+              brokenLinkCheck,
+              parameterAudit,
+              patternMatchFilter: urlMatchPattern.trim()
+            }
+          })
+        },
+        { attempts: 3, retryDelayMs: 700 }
+      );
 
-      const json = await res.json();
       if (!res.ok) {
         setError(json?.error || "Request failed");
         pushNotice("error", json?.error || "Request failed");
@@ -434,8 +472,11 @@ export default function App() {
       setCrawlJobId(jobId);
 
       while (activeJobRef.current === jobId) {
-        const statusRes = await fetch(`/api/crawl/${jobId}`, { cache: "no-store" });
-        const statusJson = await statusRes.json();
+        const { res: statusRes, json: statusJson } = await fetchJsonWithRetry(
+          `/api/crawl/${jobId}`,
+          { cache: "no-store" },
+          { attempts: 4, retryDelayMs: 700 }
+        );
 
         if (!statusRes.ok) {
           throw new Error(statusJson?.error || "Progress request failed");
