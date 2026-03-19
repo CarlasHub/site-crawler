@@ -35,6 +35,15 @@ const PARAMETER_VARIATIONS = [
   { name: "filter", value: "value" }
 ];
 
+const SOFT_FAILURE_ERROR_PATTERNS = [
+  { label: "something went wrong", re: /\bsomething went wrong\b/i },
+  { label: "unexpected error", re: /\b(unexpected error|an error occurred|application error)\b/i },
+  { label: "temporarily unavailable", re: /\b(temporarily unavailable|service unavailable|try again later)\b/i },
+  { label: "access denied", re: /\b(access denied|permission denied|forbidden)\b/i },
+  { label: "server error", re: /\b(internal server error|bad gateway|gateway timeout)\b/i },
+  { label: "page not found text on 200", re: /\b(page not found|404 not found|not found)\b/i }
+];
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -435,6 +444,7 @@ function classifyRecord(record) {
   if (record?.blockedByRobots) return "soft_failure";
   if (record?.status === null || record?.status === undefined || record?.status === 0) return "soft_failure";
   if (record.status >= 400) return "broken";
+  if (Array.isArray(record?.softFailureReasons) && record.softFailureReasons.length > 0) return "soft_failure";
   if ((record.redirectChain || []).length > 1 || (record.finalUrl && record.finalUrl !== record.url)) return "redirect_issue";
   if (record.metaRobots && /(noindex|nofollow)/i.test(record.metaRobots)) return "soft_failure";
   return "valid";
@@ -611,6 +621,189 @@ function summarizeRedirectAudit(entries) {
   });
 }
 
+function uniqueStrings(values) {
+  return Array.from(new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean)));
+}
+
+function collapseWhitespace(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function getVisiblePageText(html) {
+  try {
+    const $ = cheerio.load(html || "");
+    $("script, style, noscript, template, svg").remove();
+    return collapseWhitespace($("body").text());
+  } catch {
+    return "";
+  }
+}
+
+function detectErrorTextMatches(text) {
+  const haystack = collapseWhitespace(text).toLowerCase();
+  if (!haystack) return [];
+  return uniqueStrings(
+    SOFT_FAILURE_ERROR_PATTERNS
+      .filter((pattern) => pattern.re.test(haystack))
+      .map((pattern) => pattern.label)
+  );
+}
+
+function inferMissingExpectedComponents(pageUrl, $, bodyText) {
+  const missing = [];
+  const visibleLength = bodyText.length;
+  const pathLower = (() => {
+    try {
+      return new URL(pageUrl).pathname.toLowerCase();
+    } catch {
+      return "";
+    }
+  })();
+
+  const hasMain = $("main, [role='main'], article").length > 0;
+  const hasSearchControls = $("form, [role='search'], input[type='search'], input[name*='search' i], input[name*='keyword' i]").length > 0;
+  const resultLikeCount = $("[data-search-results], [data-job-id], [data-results], .job, .jobs, .result, .results, main a[href], article a[href]").length;
+  const looksLikeSearchPage = /search|jobs|results|find|vacanc|career/.test(pathLower) || hasSearchControls;
+
+  if (visibleLength >= 80 && !hasMain && !hasSearchControls) {
+    missing.push("primary content container missing");
+  }
+
+  if (looksLikeSearchPage && !hasSearchControls) {
+    missing.push("search controls missing");
+  }
+
+  if (looksLikeSearchPage && resultLikeCount === 0) {
+    missing.push("result content missing");
+  }
+
+  return uniqueStrings(missing);
+}
+
+function cleanEndpointCandidate(rawValue) {
+  const value = String(rawValue || "").trim().replace(/^['"`]|['"`]$/g, "");
+  if (!value) return "";
+  if (value.startsWith("javascript:") || value.startsWith("data:")) return "";
+  if (value.includes("${") || value.includes("{{") || value.includes("<%")) return "";
+  if (/^https?:/i.test(value)) return value;
+  if (value.startsWith("/") || value.startsWith("./") || value.startsWith("../") || value.startsWith("?")) return value;
+  return "";
+}
+
+function extractApiCandidates(html) {
+  const candidates = new Set();
+  const $ = cheerio.load(html || "");
+
+  ["data-api", "data-endpoint", "data-fetch-url", "data-url"].forEach((attr) => {
+    $(`[${attr}]`).each((_, el) => {
+      const raw = cleanEndpointCandidate($(el).attr(attr));
+      if (raw) candidates.add(raw);
+    });
+  });
+
+  const scriptText = $("script").map((_, el) => $(el).html() || "").get().join("\n");
+  const patterns = [
+    /fetch\s*\(\s*['"`]([^'"`]+)['"`]/g,
+    /axios\.(?:get|post|put|patch|delete)\s*\(\s*['"`]([^'"`]+)['"`]/g,
+    /\.open\s*\(\s*['"`](?:GET|POST|PUT|PATCH|DELETE)['"`]\s*,\s*['"`]([^'"`]+)['"`]/g,
+    /url\s*:\s*['"`]([^'"`]+)['"`]/g,
+    /endpoint\s*:\s*['"`]([^'"`]+)['"`]/g
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(scriptText)) && candidates.size < 20) {
+      const raw = cleanEndpointCandidate(match[1]);
+      if (raw) candidates.add(raw);
+    }
+  }
+
+  return Array.from(candidates).slice(0, 8);
+}
+
+async function probeApiCandidates(pageUrl, candidates, timeoutMs, robots, userAgent, sameHostOnly, rootHost) {
+  const jobs = (Array.isArray(candidates) ? candidates : [])
+    .map((candidate) => {
+      try {
+        const resolvedUrl = new URL(candidate, pageUrl).toString();
+        const resolved = new URL(resolvedUrl);
+        if (sameHostOnly && resolved.host !== rootHost) return null;
+        return { candidate, resolvedUrl };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+
+  const results = await concurrencyMap(jobs, Math.min(4, jobs.length || 1), async (job) => {
+    const res = await quickStatus(job.resolvedUrl, timeoutMs, robots, userAgent);
+    return {
+      source: job.candidate,
+      resolvedUrl: job.resolvedUrl,
+      finalUrl: res.finalUrl || job.resolvedUrl,
+      statusCode: res.status,
+      redirectChain: res.redirectChain || [job.resolvedUrl],
+      failed: !res.status || res.status >= 400
+    };
+  });
+
+  return results.filter(Boolean);
+}
+
+async function analyzeSoftFailurePage(pageUrl, html, timeoutMs, robots, userAgent, sameHostOnly, rootHost) {
+  const $ = cheerio.load(html || "");
+  const title = collapseWhitespace($("title").first().text());
+  const bodyText = getVisiblePageText(html);
+  const interactiveCount = $("a[href], button, input, select, textarea, form").length;
+  const shellCount = $("header, nav, footer").length;
+
+  const reasons = [];
+  if (!bodyText || (bodyText.length < 40 && interactiveCount < 3)) {
+    reasons.push("empty content");
+  } else if (bodyText.length < 120 && shellCount > 0 && interactiveCount < 4) {
+    reasons.push("page shell without meaningful content");
+  }
+
+  const missingExpectedComponents = inferMissingExpectedComponents(pageUrl, $, bodyText);
+  const errorTextMatches = detectErrorTextMatches(`${title}\n${bodyText.slice(0, 4000)}`);
+  const apiCandidates = extractApiCandidates(html);
+  const apiChecks = apiCandidates.length
+    ? await probeApiCandidates(pageUrl, apiCandidates, timeoutMs, robots, userAgent, sameHostOnly, rootHost)
+    : [];
+  const apiFailures = apiChecks.filter((entry) => entry.failed);
+
+  reasons.push(...missingExpectedComponents);
+  reasons.push(...errorTextMatches.map((match) => `error text: ${match}`));
+  if (apiFailures.length) {
+    reasons.push(`failed fetch/XHR endpoints: ${apiFailures.length}`);
+  }
+
+  return {
+    softFailureReasons: uniqueStrings(reasons),
+    missingExpectedComponents,
+    errorTextMatches,
+    apiChecks,
+    apiFailures
+  };
+}
+
+function summarizeSoftFailureAudit(entries) {
+  return entries.reduce((acc, entry) => {
+    acc.total += 1;
+    acc.apiFailures += Array.isArray(entry.apiFailures) ? entry.apiFailures.length : 0;
+    if (entry.softFailureReasons.includes("empty content")) acc.emptyContent += 1;
+    if (entry.softFailureReasons.some((reason) => reason.includes("missing"))) acc.missingExpectedComponents += 1;
+    if (entry.softFailureReasons.some((reason) => reason.startsWith("error text:"))) acc.errorTextPatterns += 1;
+    return acc;
+  }, {
+    total: 0,
+    emptyContent: 0,
+    missingExpectedComponents: 0,
+    errorTextPatterns: 0,
+    apiFailures: 0
+  });
+}
+
 function concurrencyMap(items, limit, fn) {
   return new Promise((resolve) => {
     const results = new Array(items.length);
@@ -783,7 +976,12 @@ app.post("/api/crawl", async (req, res) => {
       blockedByRobots: false,
       redirectChain: [currentUrl],
       redirectSteps: [],
-      metaRobots: ""
+      metaRobots: "",
+      softFailureReasons: [],
+      missingExpectedComponents: [],
+      errorTextMatches: [],
+      apiChecks: [],
+      apiFailures: []
     };
     existing.finalUrl = r.finalUrl || currentUrl;
     existing.blockedByRobots = !!r.blockedByRobots;
@@ -791,6 +989,30 @@ app.post("/api/crawl", async (req, res) => {
     existing.redirectChain = r.redirectChain || [currentUrl];
     existing.redirectSteps = r.redirectSteps || [];
     existing.metaRobots = r.text ? getMetaRobots(r.text) : "";
+
+    if (r.status === 200 && r.text) {
+      const softFailure = await analyzeSoftFailurePage(
+        existing.finalUrl || currentUrl,
+        r.text,
+        options.timeoutMs,
+        robots,
+        userAgent,
+        options.sameHostOnly,
+        rootHost
+      );
+      existing.softFailureReasons = softFailure.softFailureReasons;
+      existing.missingExpectedComponents = softFailure.missingExpectedComponents;
+      existing.errorTextMatches = softFailure.errorTextMatches;
+      existing.apiChecks = softFailure.apiChecks;
+      existing.apiFailures = softFailure.apiFailures;
+    } else {
+      existing.softFailureReasons = [];
+      existing.missingExpectedComponents = [];
+      existing.errorTextMatches = [];
+      existing.apiChecks = [];
+      existing.apiFailures = [];
+    }
+
     records.set(currentUrl, existing);
 
     if (!r.ok || !r.text) {
@@ -885,7 +1107,12 @@ app.post("/api/crawl", async (req, res) => {
           blockedByRobots: false,
           redirectChain: [u],
           redirectSteps: [],
-          metaRobots: ""
+          metaRobots: "",
+          softFailureReasons: [],
+          missingExpectedComponents: [],
+          errorTextMatches: [],
+          apiChecks: [],
+          apiFailures: []
         };
         existing.status = s.status;
         existing.finalUrl = s.finalUrl || existing.finalUrl || u;
@@ -907,7 +1134,12 @@ app.post("/api/crawl", async (req, res) => {
         blockedByRobots: false,
         redirectChain: [u],
         redirectSteps: [],
-        metaRobots: ""
+        metaRobots: "",
+        softFailureReasons: [],
+        missingExpectedComponents: [],
+        errorTextMatches: [],
+        apiChecks: [],
+        apiFailures: []
       };
       return {
         ...record,
@@ -915,6 +1147,13 @@ app.post("/api/crawl", async (req, res) => {
       };
     })
     .sort((a, b) => a.url.localeCompare(b.url));
+
+  const recordsByFinalUrl = new Map();
+  for (const record of out) {
+    if (record.finalUrl && !recordsByFinalUrl.has(record.finalUrl)) {
+      recordsByFinalUrl.set(record.finalUrl, record);
+    }
+  }
 
   const auditedNavigationEntries = await concurrencyMap(
     navigationEntries,
@@ -930,6 +1169,12 @@ app.post("/api/crawl", async (req, res) => {
         redirectSteps: result.redirectSteps || [],
         metaRobots: ""
       };
+      const matchedRecord = records.get(entry.originalUrl) || recordsByFinalUrl.get(record.finalUrl);
+      record.softFailureReasons = matchedRecord?.softFailureReasons || [];
+      record.missingExpectedComponents = matchedRecord?.missingExpectedComponents || [];
+      record.errorTextMatches = matchedRecord?.errorTextMatches || [];
+      record.apiChecks = matchedRecord?.apiChecks || [];
+      record.apiFailures = matchedRecord?.apiFailures || [];
       const redirectAuditEntry = buildRedirectAuditEntry(entry, result);
       return {
         originalUrl: entry.originalUrl,
@@ -949,6 +1194,10 @@ app.post("/api/crawl", async (req, res) => {
         maxRedirectsExceeded: redirectAuditEntry.maxRedirectsExceeded,
         blockedByRobots: record.blockedByRobots,
         metaRobots: "",
+        softFailureReasons: record.softFailureReasons,
+        missingExpectedComponents: record.missingExpectedComponents,
+        errorTextMatches: record.errorTextMatches,
+        apiFailures: record.apiFailures,
         classification: classifyRecord(record)
       };
     }
@@ -1001,6 +1250,21 @@ app.post("/api/crawl", async (req, res) => {
     });
 
   const redirectAuditSummary = summarizeRedirectAudit(redirectAuditEntries);
+
+  const softFailureEntries = out
+    .filter((entry) => Array.isArray(entry.softFailureReasons) && entry.softFailureReasons.length > 0)
+    .map((entry) => ({
+      url: entry.url,
+      finalUrl: entry.finalUrl,
+      statusCode: entry.status,
+      softFailureReasons: entry.softFailureReasons,
+      missingExpectedComponents: entry.missingExpectedComponents || [],
+      errorTextMatches: entry.errorTextMatches || [],
+      apiFailures: entry.apiFailures || []
+    }))
+    .sort((a, b) => a.url.localeCompare(b.url));
+
+  const softFailureSummary = summarizeSoftFailureAudit(softFailureEntries);
 
   let parameterAudit = {
     summary: {
@@ -1096,6 +1360,10 @@ app.post("/api/crawl", async (req, res) => {
     redirectAudit: {
       summary: redirectAuditSummary,
       entries: redirectAuditEntries
+    },
+    softFailureAudit: {
+      summary: softFailureSummary,
+      entries: softFailureEntries
     },
     parameterAudit
   });

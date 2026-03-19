@@ -93,6 +93,10 @@ function formatRedirectSteps(steps) {
     .join(" | ");
 }
 
+function formatSoftFailureReasons(row) {
+  return (Array.isArray(row?.softFailureReasons) ? row.softFailureReasons : []).join("; ");
+}
+
 function wildcardToRegExp(pattern) {
   const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
   return new RegExp(escaped, "i");
@@ -206,6 +210,8 @@ export default function App() {
   const auditSummary = data?.audit?.summary || null;
   const redirectAuditEntries = data?.redirectAudit?.entries || [];
   const redirectAuditSummary = data?.redirectAudit?.summary || null;
+  const softFailureEntries = data?.softFailureAudit?.entries || [];
+  const softFailureSummary = data?.softFailureAudit?.summary || null;
   const parameterAuditEntries = data?.parameterAudit?.entries || [];
   const parameterAuditSummary = data?.parameterAudit?.summary || null;
 
@@ -409,7 +415,8 @@ export default function App() {
         r?.irrelevantDestination ? "irrelevant destination" : ""
       ].filter(Boolean);
       const redirectPart = redirectFlags.length ? ` | redirects: ${redirectFlags.join(", ")}` : "";
-      return `${source}${referrer} | ${original}${redirect}${statusPart}${classification}${redirectPart}`;
+      const softFailurePart = formatSoftFailureReasons(r) ? ` | soft failure: ${formatSoftFailureReasons(r)}` : "";
+      return `${source}${referrer} | ${original}${redirect}${statusPart}${classification}${redirectPart}${softFailurePart}`;
     });
     downloadText("crawl-urls.txt", lines.join("\n"));
   }
@@ -432,7 +439,10 @@ export default function App() {
       "loopDetected",
       "multipleHops",
       "paramsLost",
-      "irrelevantDestination"
+      "irrelevantDestination",
+      "softFailureReasons",
+      "apiFailureCount",
+      "apiFailures"
     ].join(",");
     const rows = matchedUrls.map((r) => {
       const values = [
@@ -451,7 +461,10 @@ export default function App() {
         JSON.stringify(r.loopDetected ? "true" : "false"),
         JSON.stringify(r.multipleHops ? "true" : "false"),
         JSON.stringify(r.paramsLost ? "true" : "false"),
-        JSON.stringify(r.irrelevantDestination ? "true" : "false")
+        JSON.stringify(r.irrelevantDestination ? "true" : "false"),
+        JSON.stringify(formatSoftFailureReasons(r)),
+        JSON.stringify(Array.isArray(r.apiFailures) ? String(r.apiFailures.length) : "0"),
+        JSON.stringify(Array.isArray(r.apiFailures) ? r.apiFailures.map((entry) => `${entry.resolvedUrl} [${entry.statusCode ?? "n/a"}]`).join(" | ") : "")
       ];
       return values.join(",");
     });
@@ -919,6 +932,7 @@ export default function App() {
                 {redirectAuditSummary ? <span className="chip">Redirect loops {redirectAuditSummary.loops}</span> : null}
                 {redirectAuditSummary ? <span className="chip">Multi-hop {redirectAuditSummary.multipleHops}</span> : null}
                 {redirectAuditSummary ? <span className="chip">Params lost {redirectAuditSummary.paramsLost}</span> : null}
+                {softFailureSummary ? <span className="chip">API failures {softFailureSummary.apiFailures}</span> : null}
               </div>
             </div>
 
@@ -944,7 +958,8 @@ export default function App() {
                       u.irrelevantDestination ? "irrelevant destination" : ""
                     ].filter(Boolean);
                     const redirectFlagPart = redirectFlags.length ? ` | redirects: ${redirectFlags.join(", ")}` : "";
-                    return `${sourcePart}${referrerPart} | ${original}${statusPart}${redirectPart}${classificationPart}${redirectFlagPart}`;
+                    const softFailurePart = formatSoftFailureReasons(u) ? ` | soft failure: ${formatSoftFailureReasons(u)}` : "";
+                    return `${sourcePart}${referrerPart} | ${original}${statusPart}${redirectPart}${classificationPart}${redirectFlagPart}${softFailurePart}`;
                   }).join("\n")}
                   rows={14}
                 />
@@ -991,6 +1006,47 @@ export default function App() {
                     )}
                     {parameterAuditEntries.filter((entry) => entry.hasIssue).length > 80 ? (
                       <p className="muted">Showing first 80 parameter issues.</p>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+
+              {softFailureSummary ? (
+                <details className="details" open={softFailureSummary.total > 0}>
+                  <summary>
+                    Soft failures
+                    {` (${softFailureSummary.total} pages)`}
+                  </summary>
+                  <div className="dupes">
+                    <p className="help">
+                      Checked successful pages for empty content, missing expected components, error text, and failed fetch/XHR endpoints. Empty content {softFailureSummary.emptyContent}, missing expected components {softFailureSummary.missingExpectedComponents}, error text matches {softFailureSummary.errorTextPatterns}, failed API calls {softFailureSummary.apiFailures}.
+                    </p>
+                    {softFailureEntries.length ? (
+                      softFailureEntries
+                        .slice(0, 80)
+                        .map((entry) => (
+                          <div key={entry.url} className="dupeGroup">
+                            <div className="dupeHead">
+                              <div className="dupeBase">{entry.url}</div>
+                              <div className="dupeFlags">
+                                <span className="flag">status {entry.statusCode ?? "n/a"}</span>
+                                {Array.isArray(entry.apiFailures) && entry.apiFailures.length ? <span className="flag">api failures {entry.apiFailures.length}</span> : null}
+                              </div>
+                            </div>
+                            <ul className="dupeList">
+                              <li>Final URL: {entry.finalUrl}</li>
+                              <li>Reasons: {formatSoftFailureReasons(entry) || "n/a"}</li>
+                              {entry.missingExpectedComponents?.length ? <li>Missing expected components: {entry.missingExpectedComponents.join(", ")}</li> : null}
+                              {entry.errorTextMatches?.length ? <li>Error text matches: {entry.errorTextMatches.join(", ")}</li> : null}
+                              {entry.apiFailures?.length ? <li>Failed fetch/XHR: {entry.apiFailures.map((failure) => `${failure.resolvedUrl} [${failure.statusCode ?? "n/a"}]`).join(" | ")}</li> : null}
+                            </ul>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="muted">No soft failures detected.</p>
+                    )}
+                    {softFailureEntries.length > 80 ? (
+                      <p className="muted">Showing first 80 soft failures.</p>
                     ) : null}
                   </div>
                 </details>
