@@ -25,8 +25,15 @@ const DEFAULTS = {
     ".woff", ".woff2", ".ttf", ".eot"
   ],
   ignoreJobPages: true,
-  brokenLinkCheck: false
+  brokenLinkCheck: false,
+  parameterAudit: false
 };
+
+const PARAMETER_VARIATIONS = [
+  { name: "test", value: "1" },
+  { name: "page", value: "2" },
+  { name: "filter", value: "value" }
+];
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -223,40 +230,23 @@ function isJobDetailPage(pathnameLower) {
 }
 
 async function fetchText(url, timeoutMs, robots, userAgent) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
+  const r = await fetchWithRedirects(url, {
+    method: "GET",
+    timeoutMs,
+    robots,
+    userAgent,
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+  });
 
-  try {
-    if (robots && !robots.isAllowed(url, userAgent)) {
-      return { ok: false, status: 0, blockedByRobots: true, text: "", finalUrl: url };
-    }
-
-    const res = await fetch(url, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: {
-        "User-Agent": userAgent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-      }
-    });
-
-    const finalUrl = res.url || url;
-    const contentType = res.headers.get("content-type") || "";
-    const isHtml = contentType.includes("text/html") || contentType.includes("application/xhtml+xml");
-    if (!res.ok) {
-      return { ok: false, status: res.status, blockedByRobots: false, text: "", finalUrl };
-    }
-    if (!isHtml) {
-      return { ok: false, status: res.status, blockedByRobots: false, text: "", finalUrl };
-    }
-
-    const text = await res.text();
-    return { ok: true, status: res.status, blockedByRobots: false, text, finalUrl };
-  } catch {
-    return { ok: false, status: 0, blockedByRobots: false, text: "", finalUrl: url };
-  } finally {
-    clearTimeout(t);
+  const contentType = r.contentType || "";
+  const isHtml = contentType.includes("text/html") || contentType.includes("application/xhtml+xml");
+  if (!r.ok) {
+    return { ...r, text: "" };
   }
+  if (!isHtml) {
+    return { ...r, ok: false, text: "" };
+  }
+  return r;
 }
 
 async function fetchRobots(origin, timeoutMs, userAgent) {
@@ -276,37 +266,349 @@ async function fetchSitemapUrls(origin, timeoutMs, robots, userAgent) {
 }
 
 async function quickStatus(url, timeoutMs, robots, userAgent) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
+  const head = await fetchWithRedirects(url, {
+    method: "HEAD",
+    timeoutMs,
+    robots,
+    userAgent,
+    accept: "*/*"
+  });
+
+  if (head.status && head.status !== 405 && head.status !== 501) {
+    return {
+      status: head.status,
+      finalUrl: head.finalUrl,
+      blockedByRobots: !!head.blockedByRobots,
+      redirectChain: head.redirectChain || [url],
+      redirectSteps: head.redirectSteps || [],
+      loopDetected: !!head.loopDetected,
+      maxRedirectsExceeded: !!head.maxRedirectsExceeded
+    };
+  }
+
+  const get = await fetchWithRedirects(url, {
+    method: "GET",
+    timeoutMs,
+    robots,
+    userAgent,
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+  });
+
+  return {
+    status: get.status,
+    finalUrl: get.finalUrl,
+    blockedByRobots: !!get.blockedByRobots,
+    redirectChain: get.redirectChain || [url],
+    redirectSteps: get.redirectSteps || [],
+    loopDetected: !!get.loopDetected,
+    maxRedirectsExceeded: !!get.maxRedirectsExceeded
+  };
+}
+
+async function fetchWithRedirects(url, { method = "GET", timeoutMs, robots, userAgent, accept }) {
+  const redirectChain = [url];
+  const redirectSteps = [];
+  const seen = new Set([url]);
+  let current = url;
+
+  for (let i = 0; i < 10; i++) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      if (robots && !robots.isAllowed(current, userAgent)) {
+        return {
+          ok: false,
+          status: 0,
+          blockedByRobots: true,
+          text: "",
+          finalUrl: current,
+          redirectChain,
+          redirectSteps,
+          contentType: "",
+          loopDetected: false,
+          maxRedirectsExceeded: false
+        };
+      }
+
+      const res = await fetch(current, {
+        method,
+        signal: controller.signal,
+        redirect: "manual",
+        headers: {
+          "User-Agent": userAgent,
+          "Accept": accept
+        }
+      });
+
+      const location = res.headers.get("location");
+      if (res.status >= 300 && res.status < 400 && location) {
+        const nextUrl = new URL(location, current).toString();
+        redirectSteps.push({
+          url: current,
+          status: res.status,
+          location,
+          nextUrl
+        });
+        redirectChain.push(nextUrl);
+        if (seen.has(nextUrl)) {
+          return {
+            ok: false,
+            status: 310,
+            blockedByRobots: false,
+            text: "",
+            finalUrl: nextUrl,
+            redirectChain,
+            redirectSteps,
+            contentType: "",
+            loopDetected: true,
+            maxRedirectsExceeded: false
+          };
+        }
+        seen.add(nextUrl);
+        current = nextUrl;
+        continue;
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+      const text = method === "HEAD" ? "" : await res.text();
+      redirectSteps.push({
+        url: current,
+        status: res.status,
+        location: "",
+        nextUrl: ""
+      });
+      return {
+        ok: res.ok,
+        status: res.status,
+        blockedByRobots: false,
+        text,
+        finalUrl: current,
+        redirectChain,
+        redirectSteps,
+        contentType,
+        loopDetected: false,
+        maxRedirectsExceeded: false
+      };
+    } catch {
+      return {
+        ok: false,
+        status: 0,
+        blockedByRobots: false,
+        text: "",
+        finalUrl: current,
+        redirectChain,
+        redirectSteps,
+        contentType: "",
+        loopDetected: false,
+        maxRedirectsExceeded: false
+      };
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  return {
+    ok: false,
+    status: 310,
+    blockedByRobots: false,
+    text: "",
+    finalUrl: current,
+    redirectChain,
+    redirectSteps,
+    contentType: "",
+    loopDetected: false,
+    maxRedirectsExceeded: true
+  };
+}
+
+function getMetaRobots(text) {
+  try {
+    const $ = cheerio.load(text || "");
+    return String($('meta[name="robots"]').attr("content") || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function classifyRecord(record) {
+  if (record?.blockedByRobots) return "soft_failure";
+  if (record?.status === null || record?.status === undefined || record?.status === 0) return "soft_failure";
+  if (record.status >= 400) return "broken";
+  if ((record.redirectChain || []).length > 1 || (record.finalUrl && record.finalUrl !== record.url)) return "redirect_issue";
+  if (record.metaRobots && /(noindex|nofollow)/i.test(record.metaRobots)) return "soft_failure";
+  return "valid";
+}
+
+function createParameterVariant(urlString, variation) {
+  try {
+    const u = new URL(urlString);
+    u.searchParams.set(variation.name, variation.value);
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+function getComparablePath(urlString) {
+  try {
+    const u = new URL(urlString);
+    return `${u.origin}${u.pathname.replace(/\/+$/g, "") || "/"}`;
+  } catch {
+    return urlString;
+  }
+}
+
+function getSearchParamPairs(urlString) {
+  try {
+    const u = new URL(urlString);
+    return Array.from(u.searchParams.entries());
+  } catch {
+    return [];
+  }
+}
+
+function hasDroppedParams(originalUrl, finalUrl) {
+  const originalPairs = getSearchParamPairs(originalUrl);
+  if (!originalPairs.length) return false;
 
   try {
-    if (robots && !robots.isAllowed(url, userAgent)) {
-      return { status: 0, finalUrl: url, blockedByRobots: true };
-    }
-
-    const res = await fetch(url, {
-      method: "HEAD",
-      signal: controller.signal,
-      redirect: "follow",
-      headers: { "User-Agent": userAgent, "Accept": "*/*" }
-    });
-
-    return { status: res.status, finalUrl: res.url || url, blockedByRobots: false };
+    const finalParams = new URL(finalUrl).searchParams;
+    return originalPairs.some(([key, value]) => !finalParams.getAll(key).includes(value));
   } catch {
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        signal: controller.signal,
-        redirect: "follow",
-        headers: { "User-Agent": userAgent, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
-      });
-      return { status: res.status, finalUrl: res.url || url, blockedByRobots: false };
-    } catch {
-      return { status: 0, finalUrl: url, blockedByRobots: false };
-    }
-  } finally {
-    clearTimeout(t);
+    return true;
   }
+}
+
+function getPathSegments(urlString) {
+  try {
+    const u = new URL(urlString);
+    const normalized = normalizePathForRules(u.pathname || "/").toLowerCase();
+    return normalized.split("/").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function isHomeLikePath(urlString) {
+  try {
+    const u = new URL(urlString);
+    return normalizePathForRules(u.pathname || "/") === "/";
+  } catch {
+    return false;
+  }
+}
+
+function isIrrelevantDestination(originalUrl, finalUrl) {
+  try {
+    const original = new URL(originalUrl);
+    const final = new URL(finalUrl);
+
+    if (original.origin !== final.origin) return false;
+    if (getComparablePath(originalUrl) === getComparablePath(finalUrl)) return false;
+
+    if (isHomeLikePath(finalUrl) && !isHomeLikePath(originalUrl)) {
+      return true;
+    }
+
+    const originalSegments = getPathSegments(originalUrl);
+    const finalSegments = getPathSegments(finalUrl);
+    if (!originalSegments.length || !finalSegments.length) return false;
+
+    const sharedSegments = originalSegments.filter((segment) => finalSegments.includes(segment));
+    if (sharedSegments.length > 0) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function buildRedirectAuditEntry(source, result) {
+  const originalUrl = source.originalUrl;
+  const finalResolvedUrl = result.finalUrl || originalUrl;
+  const redirectChain = result.redirectChain || [originalUrl];
+  const redirectSteps = Array.isArray(result.redirectSteps) ? result.redirectSteps : [];
+  const redirectStatuses = redirectSteps
+    .map((step) => Number(step?.status || 0))
+    .filter((status) => Number.isFinite(status) && status > 0);
+  const redirectStepCount = Math.max(0, redirectChain.length - 1);
+  const loopDetected = !!result.loopDetected;
+  const multipleHops = redirectStepCount > 1;
+  const paramsLost = redirectStepCount > 0 && hasDroppedParams(originalUrl, finalResolvedUrl);
+  const irrelevantDestination = redirectStepCount > 0 && isIrrelevantDestination(originalUrl, finalResolvedUrl);
+  const hasIssue = loopDetected || multipleHops || paramsLost || irrelevantDestination;
+  const classification = redirectStepCount === 0
+    ? "direct"
+    : (hasIssue ? "redirect_issue" : "redirect_ok");
+
+  return {
+    originalUrl,
+    referrerPage: source.referrerPage || "",
+    sourceType: source.sourceType || "",
+    sourceValue: source.sourceValue || "",
+    finalResolvedUrl,
+    statusCode: result.status,
+    redirectChain,
+    redirectSteps,
+    redirectStatuses,
+    redirectStepCount,
+    loopDetected,
+    multipleHops,
+    paramsLost,
+    irrelevantDestination,
+    maxRedirectsExceeded: !!result.maxRedirectsExceeded,
+    maxOneHopPreferred: redirectStepCount <= 1,
+    hasIssue,
+    classification
+  };
+}
+
+function hasExpectedParameter(urlString, variation) {
+  try {
+    const u = new URL(urlString);
+    return u.searchParams.getAll(variation.name).includes(variation.value);
+  } catch {
+    return false;
+  }
+}
+
+function summarizeParameterAudit(entries) {
+  return entries.reduce((acc, entry) => {
+    acc.total += 1;
+    if (entry.hasIssue) acc.inconsistencies += 1;
+    if (entry.statusCode >= 400) acc.httpErrors += 1;
+    if (entry.paramsDropped) acc.paramsDropped += 1;
+    if (entry.unexpectedRedirect) acc.unexpectedRedirects += 1;
+    return acc;
+  }, {
+    total: 0,
+    inconsistencies: 0,
+    httpErrors: 0,
+    paramsDropped: 0,
+    unexpectedRedirects: 0
+  });
+}
+
+function summarizeRedirectAudit(entries) {
+  return entries.reduce((acc, entry) => {
+    acc.total += 1;
+    if (entry.redirectStepCount > 0) acc.redirected += 1;
+    if (entry.hasIssue) acc.issues += 1;
+    if (entry.loopDetected) acc.loops += 1;
+    if (entry.multipleHops) acc.multipleHops += 1;
+    if (entry.paramsLost) acc.paramsLost += 1;
+    if (entry.irrelevantDestination) acc.irrelevantDestinations += 1;
+    return acc;
+  }, {
+    total: 0,
+    redirected: 0,
+    issues: 0,
+    loops: 0,
+    multipleHops: 0,
+    paramsLost: 0,
+    irrelevantDestinations: 0
+  });
 }
 
 function concurrencyMap(items, limit, fn) {
@@ -383,6 +685,7 @@ app.post("/api/crawl", async (req, res) => {
   const visited = new Set();
   const blockedByPathLimit = new Set();
   const discovered = new Set();
+  const navigationEntries = [];
 
   const pathLimitCounters = new Map();
   const pathLimitSkipped = {};
@@ -393,6 +696,17 @@ app.post("/api/crawl", async (req, res) => {
     toVisitSet.add(urlString);
     toVisitQueue.push(urlString);
   }
+
+  function recordNavigationEntry(originalUrl, referrer, sourceType, sourceValue) {
+    navigationEntries.push({
+      originalUrl,
+      referrerPage: referrer || "",
+      sourceType,
+      sourceValue
+    });
+  }
+
+  recordNavigationEntry(start, "", "start", start);
 
   const sitemapUrls = await fetchSitemapUrls(origin, options.timeoutMs, robots, userAgent);
   if (sitemapUrls.length) {
@@ -407,6 +721,7 @@ app.post("/api/crawl", async (req, res) => {
         if (!(parts.pathname === startScope || parts.pathname.startsWith(startScope + "/"))) return;
       }
 
+      recordNavigationEntry(n, "", "sitemap", u);
       enqueue(n);
     });
   } else {
@@ -461,10 +776,21 @@ app.post("/api/crawl", async (req, res) => {
 
     const r = await fetchText(currentUrl, options.timeoutMs, robots, userAgent);
 
-    const existing = records.get(currentUrl) || { url: currentUrl, finalUrl: currentUrl, status: null, blockedByRobots: false };
+    const existing = records.get(currentUrl) || {
+      url: currentUrl,
+      finalUrl: currentUrl,
+      status: null,
+      blockedByRobots: false,
+      redirectChain: [currentUrl],
+      redirectSteps: [],
+      metaRobots: ""
+    };
     existing.finalUrl = r.finalUrl || currentUrl;
     existing.blockedByRobots = !!r.blockedByRobots;
-    existing.status = options.brokenLinkCheck ? r.status : null;
+    existing.status = r.status;
+    existing.redirectChain = r.redirectChain || [currentUrl];
+    existing.redirectSteps = r.redirectSteps || [];
+    existing.metaRobots = r.text ? getMetaRobots(r.text) : "";
     records.set(currentUrl, existing);
 
     if (!r.ok || !r.text) {
@@ -500,6 +826,32 @@ app.post("/api/crawl", async (req, res) => {
       if (isExcludedByPathname(nextPathnameLower, excludePathMatchers)) return;
       if (options.ignoreJobPages && isJobDetailPage(nextPathnameLower)) return;
 
+      recordNavigationEntry(next, currentUrl, "link", href);
+      links.push(next);
+    });
+
+    $("form[action]").each((_, el) => {
+      const action = String($(el).attr("action") || "").trim();
+      if (!action) return;
+
+      const next = normalizeUrl(action, baseForLinks, options);
+      if (!next) return;
+
+      const nextParts = parseUrlParts(next);
+      if (!nextParts) return;
+      const nextPathname = nextParts.pathname || "/";
+      const nextPathnameLower = nextPathname.toLowerCase();
+
+      if (options.scopeToStartPath && startScope !== "/") {
+        if (!(nextPathname === startScope || nextPathname.startsWith(startScope + "/"))) return;
+      }
+
+      if (options.sameHostOnly && nextParts.host !== rootHost) return;
+
+      if (hasExcludedExtension(next, options)) return;
+      if (isExcludedByPathname(nextPathnameLower, excludePathMatchers)) return;
+
+      recordNavigationEntry(next, currentUrl, "form", action);
       links.push(next);
     });
 
@@ -526,17 +878,200 @@ app.post("/api/crawl", async (req, res) => {
     if (missingStatus.length) {
       await concurrencyMap(missingStatus, Math.min(options.concurrency, 6), async (u) => {
         const s = await quickStatus(u, options.timeoutMs, robots, userAgent);
-        const existing = records.get(u) || { url: u, finalUrl: u, status: null, blockedByRobots: false };
+        const existing = records.get(u) || {
+          url: u,
+          finalUrl: u,
+          status: null,
+          blockedByRobots: false,
+          redirectChain: [u],
+          redirectSteps: [],
+          metaRobots: ""
+        };
         existing.status = s.status;
         existing.finalUrl = s.finalUrl || existing.finalUrl || u;
         existing.blockedByRobots = !!s.blockedByRobots;
+        existing.redirectChain = s.redirectChain || existing.redirectChain || [u];
+        existing.redirectSteps = s.redirectSteps || existing.redirectSteps || [];
         records.set(u, existing);
         return true;
       });
     }
   }
 
-  const out = urls.map((u) => records.get(u) || { url: u, finalUrl: u, status: null, blockedByRobots: false });
+  const out = urls
+    .map((u) => {
+      const record = records.get(u) || {
+        url: u,
+        finalUrl: u,
+        status: null,
+        blockedByRobots: false,
+        redirectChain: [u],
+        redirectSteps: [],
+        metaRobots: ""
+      };
+      return {
+        ...record,
+        classification: classifyRecord(record)
+      };
+    })
+    .sort((a, b) => a.url.localeCompare(b.url));
+
+  const auditedNavigationEntries = await concurrencyMap(
+    navigationEntries,
+    Math.min(options.concurrency, 8),
+    async (entry) => {
+      const result = await quickStatus(entry.originalUrl, options.timeoutMs, robots, userAgent);
+      const record = {
+        url: entry.originalUrl,
+        finalUrl: result.finalUrl || entry.originalUrl,
+        status: result.status,
+        blockedByRobots: !!result.blockedByRobots,
+        redirectChain: result.redirectChain || [entry.originalUrl],
+        redirectSteps: result.redirectSteps || [],
+        metaRobots: ""
+      };
+      const redirectAuditEntry = buildRedirectAuditEntry(entry, result);
+      return {
+        originalUrl: entry.originalUrl,
+        referrerPage: entry.referrerPage,
+        sourceType: entry.sourceType,
+        sourceValue: entry.sourceValue,
+        finalResolvedUrl: record.finalUrl,
+        statusCode: record.status,
+        redirectChain: record.redirectChain,
+        redirectSteps: record.redirectSteps,
+        redirectStatuses: redirectAuditEntry.redirectStatuses,
+        redirectStepCount: redirectAuditEntry.redirectStepCount,
+        loopDetected: redirectAuditEntry.loopDetected,
+        multipleHops: redirectAuditEntry.multipleHops,
+        paramsLost: redirectAuditEntry.paramsLost,
+        irrelevantDestination: redirectAuditEntry.irrelevantDestination,
+        maxRedirectsExceeded: redirectAuditEntry.maxRedirectsExceeded,
+        blockedByRobots: record.blockedByRobots,
+        metaRobots: "",
+        classification: classifyRecord(record)
+      };
+    }
+  );
+
+  const auditEntries = auditedNavigationEntries
+    .filter(Boolean)
+    .sort((a, b) => {
+      const byReferrer = a.referrerPage.localeCompare(b.referrerPage);
+      if (byReferrer !== 0) return byReferrer;
+      return a.originalUrl.localeCompare(b.originalUrl);
+    });
+
+  const auditSummary = auditEntries.reduce((acc, entry) => {
+    acc.total += 1;
+    if (entry.classification === "valid") acc.valid += 1;
+    if (entry.classification === "broken") acc.broken += 1;
+    if (entry.classification === "redirect_issue") acc.redirectIssues += 1;
+    if (entry.classification === "soft_failure") acc.softFailures += 1;
+    return acc;
+  }, { total: 0, valid: 0, broken: 0, redirectIssues: 0, softFailures: 0 });
+
+  const redirectAuditEntries = auditEntries
+    .map((entry) => ({
+      originalUrl: entry.originalUrl,
+      referrerPage: entry.referrerPage,
+      sourceType: entry.sourceType,
+      sourceValue: entry.sourceValue,
+      finalResolvedUrl: entry.finalResolvedUrl,
+      statusCode: entry.statusCode,
+      redirectChain: entry.redirectChain,
+      redirectSteps: entry.redirectSteps || [],
+      redirectStatuses: entry.redirectStatuses || [],
+      redirectStepCount: Number(entry.redirectStepCount || 0),
+      loopDetected: !!entry.loopDetected,
+      multipleHops: !!entry.multipleHops,
+      paramsLost: !!entry.paramsLost,
+      irrelevantDestination: !!entry.irrelevantDestination,
+      maxRedirectsExceeded: !!entry.maxRedirectsExceeded,
+      maxOneHopPreferred: Number(entry.redirectStepCount || 0) <= 1,
+      hasIssue: !!(entry.loopDetected || entry.multipleHops || entry.paramsLost || entry.irrelevantDestination || entry.maxRedirectsExceeded),
+      classification: Number(entry.redirectStepCount || 0) === 0
+        ? "direct"
+        : ((entry.loopDetected || entry.multipleHops || entry.paramsLost || entry.irrelevantDestination || entry.maxRedirectsExceeded) ? "redirect_issue" : "redirect_ok")
+    }))
+    .sort((a, b) => {
+      const byReferrer = a.referrerPage.localeCompare(b.referrerPage);
+      if (byReferrer !== 0) return byReferrer;
+      return a.originalUrl.localeCompare(b.originalUrl);
+    });
+
+  const redirectAuditSummary = summarizeRedirectAudit(redirectAuditEntries);
+
+  let parameterAudit = {
+    summary: {
+      total: 0,
+      inconsistencies: 0,
+      httpErrors: 0,
+      paramsDropped: 0,
+      unexpectedRedirects: 0
+    },
+    entries: []
+  };
+
+  if (options.parameterAudit) {
+    const parameterTargets = out.map((record) => ({
+      baseUrl: record.url,
+      baseFinalUrl: record.finalUrl || record.url,
+      baseStatusCode: record.status
+    }));
+
+    const parameterEntries = [];
+    const parameterJobs = [];
+    for (const target of parameterTargets) {
+      for (const variation of PARAMETER_VARIATIONS) {
+        const variantUrl = createParameterVariant(target.baseUrl, variation);
+        if (!variantUrl) continue;
+        parameterJobs.push({
+          ...target,
+          variation,
+          variantUrl
+        });
+      }
+    }
+
+    await concurrencyMap(parameterJobs, Math.min(options.concurrency, 8), async (job) => {
+      const res = await quickStatus(job.variantUrl, options.timeoutMs, robots, userAgent);
+      const paramsPreserved = hasExpectedParameter(res.finalUrl || job.variantUrl, job.variation);
+      const paramsDropped = !paramsPreserved;
+      const unexpectedRedirect =
+        (res.redirectChain || []).length > 1 &&
+        getComparablePath(res.finalUrl || job.variantUrl) !== getComparablePath(job.baseFinalUrl || job.baseUrl);
+      const hasIssue = (Number(res.status || 0) >= 400) || paramsDropped || unexpectedRedirect;
+
+      parameterEntries.push({
+        baseUrl: job.baseUrl,
+        baseFinalUrl: job.baseFinalUrl,
+        baseStatusCode: job.baseStatusCode,
+        variation: `${job.variation.name}=${job.variation.value}`,
+        parameterizedUrl: job.variantUrl,
+        finalUrl: res.finalUrl || job.variantUrl,
+        statusCode: res.status,
+        redirectChain: res.redirectChain || [job.variantUrl],
+        redirectBehaviour: (res.redirectChain || []).length > 1 ? "redirected" : "direct",
+        paramsPreserved,
+        paramsDropped,
+        unexpectedRedirect,
+        hasIssue
+      });
+      return true;
+    });
+
+    parameterEntries.sort((a, b) => {
+      const byBase = a.baseUrl.localeCompare(b.baseUrl);
+      if (byBase !== 0) return byBase;
+      return a.variation.localeCompare(b.variation);
+    });
+
+    parameterAudit = {
+      summary: summarizeParameterAudit(parameterEntries),
+      entries: parameterEntries
+    };
+  }
 
   return res.json({
     startUrl: start,
@@ -553,7 +1088,16 @@ app.post("/api/crawl", async (req, res) => {
       pathLimits: options.pathLimits || [],
       inferredLanguagePrefix: startLanguagePrefix || ""
     },
-    urls: out
+    urls: out,
+    audit: {
+      summary: auditSummary,
+      entries: auditEntries
+    },
+    redirectAudit: {
+      summary: redirectAuditSummary,
+      entries: redirectAuditEntries
+    },
+    parameterAudit
   });
 });
 

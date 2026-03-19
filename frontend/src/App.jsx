@@ -72,6 +72,27 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+function getEntryOriginalUrl(row) {
+  return String(row?.originalUrl || row?.url || "");
+}
+
+function getEntryFinalUrl(row) {
+  return String(row?.finalResolvedUrl || row?.finalUrl || "");
+}
+
+function formatRedirectSteps(steps) {
+  const list = Array.isArray(steps) ? steps : [];
+  return list
+    .map((step) => {
+      const status = step?.status ? `[${step.status}]` : "[?]";
+      const source = String(step?.url || "").trim();
+      const next = String(step?.nextUrl || "").trim();
+      return next ? `${status} ${source} -> ${next}` : `${status} ${source}`;
+    })
+    .filter(Boolean)
+    .join(" | ");
+}
+
 function wildcardToRegExp(pattern) {
   const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
   return new RegExp(escaped, "i");
@@ -88,6 +109,7 @@ export default function App() {
   const [includeQuery, setIncludeQuery] = useState(true);
   const [ignoreJobPages, setIgnoreJobPages] = useState(true);
   const [brokenLinkCheck, setBrokenLinkCheck] = useState(false);
+  const [parameterAudit, setParameterAudit] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -115,6 +137,7 @@ export default function App() {
       setIncludeQuery(!!last.includeQuery);
       setIgnoreJobPages(last.ignoreJobPages !== false);
       setBrokenLinkCheck(!!last.brokenLinkCheck);
+      setParameterAudit(!!last.parameterAudit);
       setPresetName(last.presetName || "default");
     }
   }, []);
@@ -147,10 +170,11 @@ export default function App() {
         includeQuery,
         ignoreJobPages,
         brokenLinkCheck,
+        parameterAudit,
         presetName
       })
     );
-  }, [url, excludePaths, pathLimits, maxPages, concurrency, includeQuery, ignoreJobPages, brokenLinkCheck, presetName]);
+  }, [url, excludePaths, pathLimits, maxPages, concurrency, includeQuery, ignoreJobPages, brokenLinkCheck, parameterAudit, presetName]);
 
   useEffect(() => {
     if (!loading) {
@@ -177,29 +201,35 @@ export default function App() {
       .filter((x) => x.startsWith("/"));
   }, [excludePaths]);
 
-  const urls = data?.urls || [];
+  const pageUrls = data?.urls || [];
+  const auditEntries = data?.audit?.entries || pageUrls;
+  const auditSummary = data?.audit?.summary || null;
+  const redirectAuditEntries = data?.redirectAudit?.entries || [];
+  const redirectAuditSummary = data?.redirectAudit?.summary || null;
+  const parameterAuditEntries = data?.parameterAudit?.entries || [];
+  const parameterAuditSummary = data?.parameterAudit?.summary || null;
 
   const matchedUrls = useMemo(() => {
     const pattern = urlMatchPattern.trim();
-    if (!pattern) return urls;
+    if (!pattern) return auditEntries;
 
     const lowerPattern = pattern.toLowerCase();
     const matcher = pattern.includes("*") ? wildcardToRegExp(pattern) : null;
 
-    return urls.filter((row) => {
-      const original = String(row?.url || "");
-      const finalUrl = String(row?.finalUrl || "");
+    return auditEntries.filter((row) => {
+      const original = getEntryOriginalUrl(row);
+      const finalUrl = getEntryFinalUrl(row);
       if (matcher) {
         return matcher.test(original) || matcher.test(finalUrl);
       }
       return original.toLowerCase().includes(lowerPattern) || finalUrl.toLowerCase().includes(lowerPattern);
     });
-  }, [urlMatchPattern, urls]);
+  }, [auditEntries, urlMatchPattern]);
 
   const duplicateCandidates = useMemo(() => {
     const byBase = new Map();
-    for (const row of matchedUrls) {
-      const original = row.url;
+    for (const row of pageUrls) {
+      const original = getEntryOriginalUrl(row);
       const base = baseWithoutQuery(original);
       const entry = byBase.get(base) || { base, variants: [], hasQueryVariants: false, hasLangVariants: false };
       entry.variants.push(row);
@@ -210,7 +240,7 @@ export default function App() {
     const groups = Array.from(byBase.values()).filter((g) => g.variants.length > 1 || g.hasQueryVariants || g.hasLangVariants);
     groups.sort((a, b) => b.variants.length - a.variants.length);
     return groups;
-  }, [matchedUrls]);
+  }, [pageUrls]);
 
   const sanitizedPathLimits = useMemo(() => {
     const cleaned = Array.isArray(pathLimits) ? pathLimits : [];
@@ -246,7 +276,8 @@ export default function App() {
         concurrency,
         includeQuery,
         ignoreJobPages,
-        brokenLinkCheck
+        brokenLinkCheck,
+        parameterAudit
       }
     };
 
@@ -276,6 +307,7 @@ export default function App() {
     setIncludeQuery(!!p.settings.includeQuery);
     setIgnoreJobPages(p.settings.ignoreJobPages !== false);
     setBrokenLinkCheck(!!p.settings.brokenLinkCheck);
+    setParameterAudit(!!p.settings.parameterAudit);
     setError("");
   }
 
@@ -335,7 +367,8 @@ export default function App() {
             concurrency: clamp(Number(concurrency || 6), 1, 20),
             includeQuery,
             ignoreJobPages,
-            brokenLinkCheck
+            brokenLinkCheck,
+            parameterAudit
           }
         })
       });
@@ -360,19 +393,65 @@ export default function App() {
 
   function downloadUrls() {
     if (!matchedUrls.length) return;
-    const lines = matchedUrls.map((r) => r.url);
+    const lines = matchedUrls.map((r) => {
+      const original = getEntryOriginalUrl(r);
+      const finalUrl = getEntryFinalUrl(r);
+      const source = r?.sourceType ? `${r.sourceType}: ${r.sourceValue || ""}` : "page";
+      const referrer = r?.referrerPage ? ` | referrer: ${r.referrerPage}` : "";
+      const redirect = finalUrl && finalUrl !== original ? ` -> ${finalUrl}` : "";
+      const status = r?.statusCode ?? r?.status;
+      const statusPart = status === null || status === undefined ? "" : ` [${status}]`;
+      const classification = r?.classification ? ` {${r.classification}}` : "";
+      const redirectFlags = [
+        r?.loopDetected ? "loop" : "",
+        r?.multipleHops ? "multi-hop" : "",
+        r?.paramsLost ? "params lost" : "",
+        r?.irrelevantDestination ? "irrelevant destination" : ""
+      ].filter(Boolean);
+      const redirectPart = redirectFlags.length ? ` | redirects: ${redirectFlags.join(", ")}` : "";
+      return `${source}${referrer} | ${original}${redirect}${statusPart}${classification}${redirectPart}`;
+    });
     downloadText("crawl-urls.txt", lines.join("\n"));
   }
 
   function downloadCsv() {
     if (!matchedUrls.length) return;
-    const header = ["url", "finalUrl", "status", "blockedByRobots"].join(",");
+    const header = [
+      "originalUrl",
+      "referrerPage",
+      "sourceType",
+      "sourceValue",
+      "finalResolvedUrl",
+      "statusCode",
+      "classification",
+      "blockedByRobots",
+      "redirectChain",
+      "redirectSteps",
+      "redirectStatuses",
+      "redirectStepCount",
+      "loopDetected",
+      "multipleHops",
+      "paramsLost",
+      "irrelevantDestination"
+    ].join(",");
     const rows = matchedUrls.map((r) => {
       const values = [
-        JSON.stringify(r.url || ""),
-        JSON.stringify(r.finalUrl || ""),
-        JSON.stringify(r.status === null || r.status === undefined ? "" : String(r.status)),
-        JSON.stringify(r.blockedByRobots ? "true" : "false")
+        JSON.stringify(getEntryOriginalUrl(r)),
+        JSON.stringify(r.referrerPage || ""),
+        JSON.stringify(r.sourceType || ""),
+        JSON.stringify(r.sourceValue || ""),
+        JSON.stringify(getEntryFinalUrl(r)),
+        JSON.stringify((r.statusCode ?? r.status) === null || (r.statusCode ?? r.status) === undefined ? "" : String(r.statusCode ?? r.status)),
+        JSON.stringify(r.classification || ""),
+        JSON.stringify(r.blockedByRobots ? "true" : "false"),
+        JSON.stringify(Array.isArray(r.redirectChain) ? r.redirectChain.join(" -> ") : ""),
+        JSON.stringify(formatRedirectSteps(r.redirectSteps)),
+        JSON.stringify(Array.isArray(r.redirectStatuses) ? r.redirectStatuses.join(" -> ") : ""),
+        JSON.stringify(r.redirectStepCount === null || r.redirectStepCount === undefined ? "" : String(r.redirectStepCount)),
+        JSON.stringify(r.loopDetected ? "true" : "false"),
+        JSON.stringify(r.multipleHops ? "true" : "false"),
+        JSON.stringify(r.paramsLost ? "true" : "false"),
+        JSON.stringify(r.irrelevantDestination ? "true" : "false")
       ];
       return values.join(",");
     });
@@ -381,10 +460,10 @@ export default function App() {
 
   const summary = useMemo(() => {
     if (!data) return null;
-    const total = urls.length;
-    const redirects = urls.filter((u) => (u.finalUrl || u.url) !== u.url).length;
-    const broken = urls.filter((u) => {
-      const s = Number(u.status);
+    const total = pageUrls.length;
+    const redirects = pageUrls.filter((u) => getEntryFinalUrl(u) !== getEntryOriginalUrl(u)).length;
+    const broken = pageUrls.filter((u) => {
+      const s = Number(u.statusCode ?? u.status);
       if (!s) return false;
       return s >= 400;
     }).length;
@@ -397,7 +476,7 @@ export default function App() {
       fromSitemap: !!data.counts?.fromSitemap,
       visited: data.counts?.visited || 0
     };
-  }, [data, urls]);
+  }, [data, pageUrls]);
 
   const brandName = isBookmarklet ? "Cat Crawler" : "Carla’s tools";
   const brandTag = isBookmarklet
@@ -724,6 +803,15 @@ export default function App() {
                   />
                   <span>Broken link quick check</span>
                 </label>
+
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={parameterAudit}
+                    onChange={(e) => setParameterAudit(e.target.checked)}
+                  />
+                  <span>Parameter audit</span>
+                </label>
               </div>
 
               <div className="actions">
@@ -824,26 +912,135 @@ export default function App() {
               <div className="panelMeta">
                 <span className="chip">Sitemap {data?.counts?.fromSitemap ? "yes" : "no"}</span>
                 <span className="chip">Status checked {brokenLinkCheck ? "yes" : "no"}</span>
+                {auditSummary ? <span className="chip">Valid {auditSummary.valid}</span> : null}
+                {auditSummary ? <span className="chip">Broken {auditSummary.broken}</span> : null}
+                {auditSummary ? <span className="chip">Redirect issues {auditSummary.redirectIssues}</span> : null}
+                {auditSummary ? <span className="chip">Soft failures {auditSummary.softFailures}</span> : null}
+                {redirectAuditSummary ? <span className="chip">Redirect loops {redirectAuditSummary.loops}</span> : null}
+                {redirectAuditSummary ? <span className="chip">Multi-hop {redirectAuditSummary.multipleHops}</span> : null}
+                {redirectAuditSummary ? <span className="chip">Params lost {redirectAuditSummary.paramsLost}</span> : null}
               </div>
             </div>
 
             <div className="resultsGrid">
               <div className="field">
-                <label htmlFor="urls">URLs</label>
+                <label htmlFor="urls">Audit report</label>
                 <textarea
                   id="urls"
                   readOnly
                   value={matchedUrls.map((u) => {
-                    const statusPart = u.status !== null && u.status !== undefined && u.status !== "" ? ` [${u.status}]` : "";
-                    const redirectPart = u.finalUrl && u.finalUrl !== u.url ? ` -> ${u.finalUrl}` : "";
-                    return `${u.url}${statusPart}${redirectPart}`;
+                    const original = getEntryOriginalUrl(u);
+                    const finalUrl = getEntryFinalUrl(u);
+                    const status = u.statusCode ?? u.status;
+                    const statusPart = status !== null && status !== undefined && status !== "" ? ` [${status}]` : "";
+                    const redirectPart = finalUrl && finalUrl !== original ? ` -> ${finalUrl}` : "";
+                    const sourcePart = u.sourceType ? `${u.sourceType}: ${u.sourceValue || ""}` : "page";
+                    const referrerPart = u.referrerPage ? ` | referrer: ${u.referrerPage}` : "";
+                    const classificationPart = u.classification ? ` | ${u.classification}` : "";
+                    const redirectFlags = [
+                      u.loopDetected ? "loop" : "",
+                      u.multipleHops ? "multi-hop" : "",
+                      u.paramsLost ? "params lost" : "",
+                      u.irrelevantDestination ? "irrelevant destination" : ""
+                    ].filter(Boolean);
+                    const redirectFlagPart = redirectFlags.length ? ` | redirects: ${redirectFlags.join(", ")}` : "";
+                    return `${sourcePart}${referrerPart} | ${original}${statusPart}${redirectPart}${classificationPart}${redirectFlagPart}`;
                   }).join("\n")}
                   rows={14}
                 />
                 <p className="help">
-                  Showing {matchedUrls.length} of {urls.length} crawled URLs.
+                  Showing {matchedUrls.length} of {auditEntries.length} audit entries from {pageUrls.length} crawled pages.
                 </p>
               </div>
+
+              {parameterAuditSummary ? (
+                <details className="details" open={parameterAuditSummary.inconsistencies > 0}>
+                  <summary>
+                    Parameter audit
+                    {` (${parameterAuditSummary.inconsistencies} inconsistencies)`}
+                  </summary>
+                  <div className="dupes">
+                    <p className="help">
+                      Checked {parameterAuditSummary.total} parameterized requests. HTTP errors {parameterAuditSummary.httpErrors}, params dropped {parameterAuditSummary.paramsDropped}, unexpected redirects {parameterAuditSummary.unexpectedRedirects}.
+                    </p>
+                    {parameterAuditEntries.length ? (
+                      parameterAuditEntries
+                        .filter((entry) => entry.hasIssue)
+                        .slice(0, 80)
+                        .map((entry) => (
+                          <div key={`${entry.baseUrl}-${entry.variation}`} className="dupeGroup">
+                            <div className="dupeHead">
+                              <div className="dupeBase">{entry.baseUrl}</div>
+                              <div className="dupeFlags">
+                                <span className="flag">{entry.variation}</span>
+                                <span className="flag">status {entry.statusCode ?? "n/a"}</span>
+                                {!entry.paramsPreserved ? <span className="flag">params dropped</span> : null}
+                                {entry.unexpectedRedirect ? <span className="flag">unexpected redirect</span> : null}
+                              </div>
+                            </div>
+                            <ul className="dupeList">
+                              <li>Parameterized URL: {entry.parameterizedUrl}</li>
+                              <li>Final URL: {entry.finalUrl}</li>
+                              <li>Redirect behaviour: {entry.redirectBehaviour}</li>
+                              <li>Parameter preservation: {entry.paramsPreserved ? "preserved" : "not preserved"}</li>
+                            </ul>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="muted">No parameter audit issues detected.</p>
+                    )}
+                    {parameterAuditEntries.filter((entry) => entry.hasIssue).length > 80 ? (
+                      <p className="muted">Showing first 80 parameter issues.</p>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+
+              {redirectAuditSummary ? (
+                <details className="details" open={redirectAuditSummary.issues > 0}>
+                  <summary>
+                    Redirect audit
+                    {` (${redirectAuditSummary.issues} issues)`}
+                  </summary>
+                  <div className="dupes">
+                    <p className="help">
+                      Checked {redirectAuditSummary.total} navigation paths. Redirected {redirectAuditSummary.redirected}, loops {redirectAuditSummary.loops}, multi-hop chains {redirectAuditSummary.multipleHops}, params lost {redirectAuditSummary.paramsLost}, irrelevant destinations {redirectAuditSummary.irrelevantDestinations}.
+                    </p>
+                    {redirectAuditEntries.filter((entry) => entry.hasIssue).length ? (
+                      redirectAuditEntries
+                        .filter((entry) => entry.hasIssue)
+                        .slice(0, 80)
+                        .map((entry) => (
+                          <div key={`${entry.referrerPage}-${entry.originalUrl}-${entry.sourceType}-${entry.sourceValue}`} className="dupeGroup">
+                            <div className="dupeHead">
+                              <div className="dupeBase">{entry.originalUrl}</div>
+                              <div className="dupeFlags">
+                                <span className="flag">status {entry.statusCode ?? "n/a"}</span>
+                                <span className="flag">hops {entry.redirectStepCount}</span>
+                                {entry.loopDetected ? <span className="flag">loop</span> : null}
+                                {entry.multipleHops ? <span className="flag">multi-hop</span> : null}
+                                {entry.paramsLost ? <span className="flag">params lost</span> : null}
+                                {entry.irrelevantDestination ? <span className="flag">irrelevant destination</span> : null}
+                              </div>
+                            </div>
+                            <ul className="dupeList">
+                              <li>Source: {entry.sourceType || "page"} {entry.sourceValue ? `(${entry.sourceValue})` : ""}</li>
+                              <li>Referrer: {entry.referrerPage || "start"}</li>
+                              <li>Final URL: {entry.finalResolvedUrl}</li>
+                              <li>Statuses: {Array.isArray(entry.redirectStatuses) && entry.redirectStatuses.length ? entry.redirectStatuses.join(" -> ") : (entry.statusCode ?? "n/a")}</li>
+                              <li>Chain: {formatRedirectSteps(entry.redirectSteps) || (Array.isArray(entry.redirectChain) ? entry.redirectChain.join(" -> ") : entry.finalResolvedUrl)}</li>
+                            </ul>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="muted">No redirect issues detected.</p>
+                    )}
+                    {redirectAuditEntries.filter((entry) => entry.hasIssue).length > 80 ? (
+                      <p className="muted">Showing first 80 redirect issues.</p>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
 
               <details className="details">
                 <summary>Duplicate content candidates</summary>
