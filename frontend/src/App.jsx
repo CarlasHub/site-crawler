@@ -210,6 +210,8 @@ export default function App() {
   const pageUrls = data?.urls || [];
   const auditEntries = data?.audit?.entries || pageUrls;
   const auditSummary = data?.audit?.summary || null;
+  const impactAuditEntries = data?.impactAudit?.entries || [];
+  const impactAuditSummary = data?.impactAudit?.summary || null;
   const redirectAuditEntries = data?.redirectAudit?.entries || [];
   const redirectAuditSummary = data?.redirectAudit?.summary || null;
   const softFailureEntries = data?.softFailureAudit?.entries || [];
@@ -936,6 +938,8 @@ export default function App() {
                 {auditSummary ? <span className="chip">Broken {auditSummary.broken}</span> : null}
                 {auditSummary ? <span className="chip">Redirect issues {auditSummary.redirectIssues}</span> : null}
                 {auditSummary ? <span className="chip">Soft failures {auditSummary.softFailures}</span> : null}
+                {impactAuditSummary ? <span className="chip">High impact {impactAuditSummary.high}</span> : null}
+                {impactAuditSummary ? <span className="chip">Medium impact {impactAuditSummary.medium}</span> : null}
                 {redirectAuditSummary ? <span className="chip">Redirect loops {redirectAuditSummary.loops}</span> : null}
                 {redirectAuditSummary ? <span className="chip">Multi-hop {redirectAuditSummary.multipleHops}</span> : null}
                 {redirectAuditSummary ? <span className="chip">Params lost {redirectAuditSummary.paramsLost}</span> : null}
@@ -1015,6 +1019,47 @@ export default function App() {
                     )}
                     {parameterAuditEntries.filter((entry) => entry.hasIssue).length > 80 ? (
                       <p className="muted">Showing first 80 parameter issues.</p>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+
+              {impactAuditSummary ? (
+                <details className="details" open={impactAuditSummary.high > 0}>
+                  <summary>
+                    Issue impact
+                    {` (${impactAuditSummary.total} issues)`}
+                  </summary>
+                  <div className="dupes">
+                    <p className="help">
+                      Broken issues {impactAuditSummary.broken}, redirected issues {impactAuditSummary.redirected}. High impact {impactAuditSummary.high}, medium {impactAuditSummary.medium}, low {impactAuditSummary.low}.
+                    </p>
+                    {impactAuditEntries.length ? (
+                      impactAuditEntries.slice(0, 80).map((entry) => (
+                        <div key={`${entry.issueType}-${entry.originalUrl}`} className="dupeGroup">
+                          <div className="dupeHead">
+                            <div className="dupeBase">{entry.originalUrl}</div>
+                            <div className="dupeFlags">
+                              <span className="flag">{entry.impactLevel}</span>
+                              <span className="flag">{entry.issueType}</span>
+                              <span className="flag">occurrences {entry.occurrenceCount}</span>
+                              <span className="flag">referrers {entry.referrerCount}</span>
+                            </div>
+                          </div>
+                          <ul className="dupeList">
+                            <li>Final URL: {entry.finalResolvedUrl}</li>
+                            <li>Status: {entry.statusCode ?? "n/a"}</li>
+                            <li>Reasons: {Array.isArray(entry.reasons) ? entry.reasons.join(", ") : "n/a"}</li>
+                            <li>Core flow: {entry.coreFlow ? "yes" : "no"}</li>
+                            <li>Referrer pages: {Array.isArray(entry.referrerPages) && entry.referrerPages.length ? entry.referrerPages.join(" | ") : "start"}</li>
+                          </ul>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">No broken or redirected issues detected.</p>
+                    )}
+                    {impactAuditEntries.length > 80 ? (
+                      <p className="muted">Showing first 80 prioritised issues.</p>
                     ) : null}
                   </div>
                 </details>

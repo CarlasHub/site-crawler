@@ -1009,6 +1009,179 @@ function buildPatternAudit(records, filterValue) {
   };
 }
 
+function isHomePageLike(urlString, startUrl) {
+  try {
+    const url = new URL(urlString);
+    const start = new URL(startUrl);
+    const cleanPath = url.pathname.replace(/\/+$/g, "") || "/";
+    const startPath = start.pathname.replace(/\/+$/g, "") || "/";
+    return url.origin === start.origin && (cleanPath === "/" || cleanPath === startPath);
+  } catch {
+    return false;
+  }
+}
+
+function determineImpactLevel(entry, startUrl) {
+  const occurrenceCount = Number(entry.occurrenceCount || 0);
+  const referrerCount = Number(entry.referrerCount || 0);
+  const isBroken = entry.issueType === "broken";
+  const isRedirectIssue = entry.issueType === "redirect";
+  const coreFlow = !!entry.coreFlow;
+  const repeated = occurrenceCount >= 3 || referrerCount >= 3;
+  const mediumRepeat = occurrenceCount >= 2 || referrerCount >= 2;
+  const severeRedirect = !!(entry.maxRedirectsExceeded || entry.loopDetected || entry.multipleHops || entry.paramsLost || entry.irrelevantDestination);
+
+  if ((isBroken && (coreFlow || repeated)) || (isRedirectIssue && severeRedirect && (coreFlow || repeated))) {
+    return "high";
+  }
+
+  if (isBroken || severeRedirect || coreFlow || mediumRepeat) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function buildImpactAudit(auditEntries, startUrl) {
+  const relevantEntries = (Array.isArray(auditEntries) ? auditEntries : []).filter((entry) => {
+    const statusCode = Number(entry.statusCode || 0);
+    const redirected = Number(entry.redirectStepCount || 0) > 0 || getEntryFinalUrlForImpact(entry) !== getEntryOriginalUrlForImpact(entry);
+    return statusCode >= 400 || redirected;
+  });
+
+  const issueMap = new Map();
+
+  for (const entry of relevantEntries) {
+    const originalUrl = getEntryOriginalUrlForImpact(entry);
+    const finalResolvedUrl = getEntryFinalUrlForImpact(entry);
+    const statusCode = Number(entry.statusCode || 0);
+    const redirectStepCount = Number(entry.redirectStepCount || 0);
+    const issueType = statusCode >= 400 ? "broken" : "redirect";
+    const key = `${issueType}|${originalUrl}`;
+    const existing = issueMap.get(key) || {
+      issueType,
+      originalUrl,
+      finalResolvedUrl,
+      statusCode,
+      occurrenceCount: 0,
+      referrers: new Set(),
+      sourceTypes: new Set(),
+      sourceValues: new Set(),
+      redirectStepCount,
+      loopDetected: false,
+      multipleHops: false,
+      paramsLost: false,
+      irrelevantDestination: false,
+      maxRedirectsExceeded: false,
+      coreFlow: false,
+      reasons: new Set()
+    };
+
+    existing.occurrenceCount += 1;
+    if (entry.referrerPage) existing.referrers.add(entry.referrerPage);
+    if (entry.sourceType) existing.sourceTypes.add(entry.sourceType);
+    if (entry.sourceValue) existing.sourceValues.add(entry.sourceValue);
+    existing.finalResolvedUrl = existing.finalResolvedUrl || finalResolvedUrl;
+    existing.statusCode = existing.statusCode || statusCode;
+    existing.redirectStepCount = Math.max(existing.redirectStepCount, redirectStepCount);
+    existing.loopDetected = existing.loopDetected || !!entry.loopDetected;
+    existing.multipleHops = existing.multipleHops || !!entry.multipleHops;
+    existing.paramsLost = existing.paramsLost || !!entry.paramsLost;
+    existing.irrelevantDestination = existing.irrelevantDestination || !!entry.irrelevantDestination;
+    existing.maxRedirectsExceeded = existing.maxRedirectsExceeded || !!entry.maxRedirectsExceeded;
+
+    const sourceType = String(entry.sourceType || "");
+    const referrerPage = String(entry.referrerPage || "");
+    const fromHome = referrerPage ? isHomePageLike(referrerPage, startUrl) : false;
+    const coreFlow = sourceType === "start" || sourceType === "form" || sourceType === "sitemap" || fromHome;
+    existing.coreFlow = existing.coreFlow || coreFlow;
+
+    if (issueType === "broken") {
+      existing.reasons.add(`http ${statusCode || "0"}`);
+      if (coreFlow) existing.reasons.add("core flow");
+      if (existing.occurrenceCount > 1) existing.reasons.add("repeated link");
+    } else {
+      if (existing.multipleHops) existing.reasons.add("multiple hops");
+      if (existing.loopDetected) existing.reasons.add("redirect loop");
+      if (existing.paramsLost) existing.reasons.add("params lost");
+      if (existing.irrelevantDestination) existing.reasons.add("irrelevant destination");
+      if (existing.maxRedirectsExceeded) existing.reasons.add("max redirects exceeded");
+      if (coreFlow) existing.reasons.add("core flow");
+      if (existing.occurrenceCount > 1) existing.reasons.add("repeated link");
+      if (!existing.reasons.size) existing.reasons.add("redirected URL");
+    }
+
+    issueMap.set(key, existing);
+  }
+
+  const entries = Array.from(issueMap.values())
+    .map((entry) => {
+      const referrerPages = Array.from(entry.referrers).sort();
+      const sourceTypes = Array.from(entry.sourceTypes).sort();
+      const impactLevel = determineImpactLevel({
+        ...entry,
+        referrerCount: referrerPages.length
+      }, startUrl);
+
+      return {
+        issueType: entry.issueType,
+        impactLevel,
+        originalUrl: entry.originalUrl,
+        finalResolvedUrl: entry.finalResolvedUrl,
+        statusCode: entry.statusCode,
+        occurrenceCount: entry.occurrenceCount,
+        referrerCount: referrerPages.length,
+        referrerPages: referrerPages.slice(0, 12),
+        sourceTypes,
+        redirectStepCount: entry.redirectStepCount,
+        loopDetected: entry.loopDetected,
+        multipleHops: entry.multipleHops,
+        paramsLost: entry.paramsLost,
+        irrelevantDestination: entry.irrelevantDestination,
+        maxRedirectsExceeded: entry.maxRedirectsExceeded,
+        coreFlow: entry.coreFlow,
+        reasons: Array.from(entry.reasons)
+      };
+    })
+    .sort((a, b) => {
+      const impactRank = { high: 0, medium: 1, low: 2 };
+      const byImpact = (impactRank[a.impactLevel] ?? 9) - (impactRank[b.impactLevel] ?? 9);
+      if (byImpact !== 0) return byImpact;
+      const byOccurrences = b.occurrenceCount - a.occurrenceCount;
+      if (byOccurrences !== 0) return byOccurrences;
+      const byReferrers = b.referrerCount - a.referrerCount;
+      if (byReferrers !== 0) return byReferrers;
+      return a.originalUrl.localeCompare(b.originalUrl);
+    });
+
+  const summary = entries.reduce((acc, entry) => {
+    acc.total += 1;
+    if (entry.issueType === "broken") acc.broken += 1;
+    if (entry.issueType === "redirect") acc.redirected += 1;
+    if (entry.impactLevel === "high") acc.high += 1;
+    if (entry.impactLevel === "medium") acc.medium += 1;
+    if (entry.impactLevel === "low") acc.low += 1;
+    return acc;
+  }, {
+    total: 0,
+    broken: 0,
+    redirected: 0,
+    high: 0,
+    medium: 0,
+    low: 0
+  });
+
+  return { summary, entries };
+}
+
+function getEntryOriginalUrlForImpact(entry) {
+  return String(entry?.originalUrl || entry?.url || "");
+}
+
+function getEntryFinalUrlForImpact(entry) {
+  return String(entry?.finalResolvedUrl || entry?.finalUrl || getEntryOriginalUrlForImpact(entry));
+}
+
 function concurrencyMap(items, limit, fn) {
   return new Promise((resolve) => {
     const results = new Array(items.length);
@@ -1426,6 +1599,8 @@ app.post("/api/crawl", async (req, res) => {
     return acc;
   }, { total: 0, valid: 0, broken: 0, redirectIssues: 0, softFailures: 0 });
 
+  const impactAudit = buildImpactAudit(auditEntries, start);
+
   const redirectAuditEntries = auditEntries
     .map((entry) => ({
       originalUrl: entry.originalUrl,
@@ -1564,6 +1739,7 @@ app.post("/api/crawl", async (req, res) => {
       summary: auditSummary,
       entries: auditEntries
     },
+    impactAudit,
     redirectAudit: {
       summary: redirectAuditSummary,
       entries: redirectAuditEntries
