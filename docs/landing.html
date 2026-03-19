@@ -193,7 +193,7 @@
         <span class="tag">Cat Crawler · Drag-to-install bookmarklet</span>
         <h1>Fast, focused crawling for content teams.</h1>
         <p class="sub">
-          Crawl a site with smart exclusions, language-agnostic limits, and optional broken-link checks. Built for quick QA and clean URL lists.
+          Crawl a site with smart exclusions, language-agnostic limits, redirect tracing, parameter validation, and soft-failure checks. Built for quick QA and clean URL lists.
           Drag the Cat Crawler button straight to your bookmarks bar, then click it on any site to open the crawler with the current page prefilled.
         </p>
         <div class="cta-row">
@@ -223,11 +223,11 @@
         </div>
         <div class="card">
           <h3>What’s new</h3>
-          <p>Drag-and-drop bookmarklet install, instant launch on the current page, and cleaner exclusion matching.</p>
+          <p>Draggable and resizable bookmarklet panel, richer audit reports, and cleaner exclusion matching.</p>
         </div>
         <div class="card">
           <h3>Built-in outputs</h3>
-          <p>Export TXT/CSV with final URLs, redirects, and optional status codes.</p>
+          <p>Broken links, redirect issues, parameter issues, soft failures, impact analysis, and TXT/CSV export.</p>
         </div>
       </section>
 
@@ -259,7 +259,7 @@
             <div class="step-num">4</div>
             <div>
               <h4>Choose options</h4>
-              <p>Adjust max pages/concurrency; toggle “Ignore job pages” or “Broken link quick check.”</p>
+              <p>Adjust max pages/concurrency; toggle “Ignore job pages,” “Broken link quick check,” or “Parameter audit.”</p>
             </div>
           </div>
           <div class="step">
@@ -271,7 +271,7 @@
           </div>
         </div>
         <div class="note">
-          Tip: enable “Broken link quick check” to capture HTTP status codes and spot 404s quickly.
+          Tip: enable “Broken link quick check” for live HTTP status codes and “Parameter audit” when you need querystring validation.
         </div>
       </section>
 
@@ -283,6 +283,7 @@
             <li>Drag the <code>Drag Cat Crawler 😼</code> button above to your bookmarks bar.</li>
             <li>Open any page you want to inspect.</li>
             <li>Click the saved Cat Crawler bookmark to open the crawler with the current URL prefilled.</li>
+            <li>Drag the header to move it, then resize from any corner.</li>
           </ol>
         </div>
         <div class="card">
@@ -292,6 +293,7 @@
             <li>Confirm sitemap available and robots.txt respected</li>
             <li>Exclude careers/job sections unless needed</li>
             <li>Cap pagination-heavy paths</li>
+            <li>Check redirect issues, soft failures, and impact ranking before export</li>
             <li>Export CSV and share with stakeholders</li>
           </ul>
         </div>
@@ -300,11 +302,11 @@
       <section class="section grid-2">
         <div class="card">
           <h3>Results you can trust</h3>
-          <p>Each URL includes original + final destination, optional HTTP status, and flags for duplicates.</p>
+          <p>Each entry includes source, referrer, final destination, status, and classification across broken, redirect, parameter, and soft-failure checks.</p>
         </div>
         <div class="card">
           <h3>Team-friendly presets</h3>
-          <p>Save configurations per client, export to JSON, and re-use for future audits.</p>
+          <p>Save configurations per client, export to JSON, and re-use full audit setups for future validations.</p>
         </div>
       </section>
 

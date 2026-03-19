@@ -1,6 +1,6 @@
 # Cat Crawler
 
-> Discover internal URLs with exclusions, redirects, duplicates, presets, and language-agnostic path limits.
+> Crawl and validate websites for broken links, redirects, parameter handling, soft failures, URL patterns, and impact.
 
 ![UI screenshot](docs/screenshot.png)
 
@@ -30,13 +30,20 @@
 - Sitemap-first discovery when sitemap.xml is available
 - robots.txt respected before fetching any URL
 - Same-host crawling with optional scope limited to the start path
+- Navigation audit across both anchor links and form actions
 - Exclude paths using relative paths, one per line
 - Language-agnostic crawl limits by path (for example `/job` also matches `/en/job`, `/fr/job`)
 - Ignore job pages by default to prevent job-heavy sections from flooding results
-- Redirect resolution with original URL and final URL stored
+- Redirect resolution with full redirect chains, per-step status codes, and final URL stored
 - Optional broken link quick check with HTTP status recording
+- Parameter audit for `?test=1`, `?page=2`, and `?filter=value`
+- Soft-failure detection for successful pages with missing content, error text, or failed API/XHR endpoints
+- URL pattern audit for duplicate structures, legacy/current paths, and inconsistent naming
+- Impact analysis for broken and redirected URLs based on repetition, referrers, and core-flow heuristics
+- Consolidated validation report with broken URLs, redirect issues, parameter issues, soft failures, and impact analysis
 - Duplicate content candidates detection, including querystring and language variants
 - Client presets saved in localStorage, export and import presets as JSON
+- Bookmarklet opens in a draggable, resizable in-page panel with 4-corner resize handles
 - Glass UI with progress ring and animated orb during crawl
 
 ---
@@ -45,7 +52,7 @@
 
 This project is deployed on a personal Cloud Run host:
 
-https://site-crawler-909296093050.europe-west2.run.app/
+https://site-crawler-989268314020.europe-west2.run.app/
 
 For production use, deploy to **your own** Cloud Run service and update `APP_ORIGIN` in `docs/bookmarklet.js`.
 
@@ -79,19 +86,19 @@ For production use, deploy to **your own** Cloud Run service and update `APP_ORI
 2. Add optional exclude paths such as `/jobs`, `/careers`, `/admin`.
 3. Define crawl limits by path if required.
 4. Configure max pages and concurrency.
-5. Choose options such as ignoring job pages or running a broken link check.
+5. Choose options such as ignoring job pages, running a broken link check, or enabling parameter audit.
 6. Run the crawl.
-7. Review results and export TXT or CSV if needed.
+7. Review the validation report, audit sections, and export TXT or CSV if needed.
 
 ### Quick start (step-by-step)
 1. Paste the site homepage in **Homepage URL** (e.g. `https://example.com`).
 2. Add **Exclude paths** (one per line). Only lines starting with `/` are used.
 3. Add **Crawl limits by path** to cap noisy sections (e.g. `/job` max 5).
 4. Set **Max pages** and **Concurrency** based on how deep you want to go.
-5. Toggle **Ignore job pages** or **Broken link quick check** if needed.
+5. Toggle **Ignore job pages**, **Broken link quick check**, or **Parameter audit** if needed.
 6. Click **Run crawl**, then download **TXT** or **CSV** from Results.
 
-Tip: if you enable **Broken link quick check**, you can filter status codes to spot 404s quickly.
+Tip: enable **Broken link quick check** to classify live HTTP errors, and enable **Parameter audit** when you need route-level querystring validation.
 
 ### Landing page
 See a marketing-style overview at `docs/landing.html` (matches the in-app color scheme).
@@ -144,7 +151,12 @@ Each discovered URL is filtered using:
 - The UI displays progress using a time-based progress indicator while crawling.
 
 ### Results
-- Returned URLs include original URL, final URL after redirects, and optional HTTP status.
+- Returned URLs include original URL, final URL after redirects, HTTP status, source type, and referrer page.
+- Audit entries are classified as `valid`, `broken`, `redirect_issue`, or `soft_failure`.
+- Redirect audit highlights loops, multi-hop redirects, dropped params, and irrelevant destinations.
+- Soft-failure audit flags successful pages that still fail functionally.
+- Impact audit prioritises broken and redirect issues by repetition and core-flow importance.
+- Pattern audit groups URLs by structure and highlights inconsistencies.
 - Duplicate candidates are grouped by base URL and flagged when query or language variants exist.
 - Results can be exported as TXT or CSV.
 
@@ -165,10 +177,22 @@ Request body:
     "concurrency": 6,
     "includeQuery": true,
     "ignoreJobPages": true,
-    "brokenLinkCheck": false
+    "brokenLinkCheck": false,
+    "parameterAudit": true,
+    "patternMatchFilter": "/jobs"
   }
 }
 ```
+
+Key response sections:
+- `urls`: crawled page records
+- `audit`: validated navigation entries with referrer pages and classifications
+- `issueReport`: broken URLs, redirect issues, parameter issues, soft failures, and impact analysis
+- `impactAudit`: prioritised broken/redirect issues
+- `redirectAudit`: redirect-chain QA
+- `softFailureAudit`: successful-but-broken pages
+- `patternAudit`: structural URL grouping and inconsistency detection
+- `parameterAudit`: query-parameter handling checks
 
 ---
 
@@ -179,8 +203,9 @@ Use the crawler on the page you are currently visiting.
 1. Open the GitHub Pages landing page in `docs/index.html`.
 2. Drag the **Cat Crawler** bookmarklet button to your bookmarks bar.
 3. Click the bookmark on any site to open **Cat Crawler**. It auto-fills the current page URL.
+4. Drag the panel by the top bar and resize it from any of the four corners.
 
-Tip: The landing page button **Cat Crawler 😼** is a live bookmarklet link, so you can drag it to your bookmarks bar to install the latest script.
+Tip: The landing page button **Drag Cat Crawler 😼** is now a loader bookmarklet. Reinstall it once, and future bookmarklet UI updates will come from `bookmarklet.js` without another reinstall.
 
 ---
 
