@@ -2,6 +2,7 @@ import express from "express";
 import * as cheerio from "cheerio";
 import robotsParser from "robots-parser";
 import path from "path";
+import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
 
 const app = express();
@@ -45,8 +46,109 @@ const SOFT_FAILURE_ERROR_PATTERNS = [
   { label: "page not found text on 200", re: /\b(page not found|404 not found|not found)\b/i }
 ];
 
+const CRAWL_JOB_TTL_MS = 30 * 60 * 1000;
+const crawlJobs = new Map();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+function pruneCrawlJobs() {
+  const now = Date.now();
+  for (const [jobId, job] of crawlJobs.entries()) {
+    const lastTouchedAt = Number(job?.finishedAt || job?.updatedAt || 0);
+    if (lastTouchedAt && now - lastTouchedAt > CRAWL_JOB_TTL_MS) {
+      crawlJobs.delete(jobId);
+    }
+  }
+}
+
+function makeJobProgress(overrides = {}) {
+  return {
+    phase: "queued",
+    message: "Queued",
+    percent: 0,
+    pagesCrawled: 0,
+    pagesQueued: 0,
+    pagesDiscovered: 0,
+    maxPages: 0,
+    auditEntriesTested: 0,
+    auditEntriesTotal: 0,
+    parameterChecksDone: 0,
+    parameterChecksTotal: 0,
+    updatedAt: new Date().toISOString(),
+    ...overrides
+  };
+}
+
+function createProgressEmitter(onProgress) {
+  let lastSentAt = 0;
+  let lastPercent = -1;
+  let lastPhase = "";
+  let lastPagesCrawled = -1;
+
+  return (patch = {}, force = false) => {
+    const next = makeJobProgress(patch);
+    const now = Date.now();
+    const shouldEmit =
+      force ||
+      next.percent !== lastPercent ||
+      next.phase !== lastPhase ||
+      next.pagesCrawled !== lastPagesCrawled ||
+      now - lastSentAt >= 250;
+
+    if (!shouldEmit) return;
+
+    lastSentAt = now;
+    lastPercent = next.percent;
+    lastPhase = next.phase;
+    lastPagesCrawled = next.pagesCrawled;
+    onProgress(next);
+  };
+}
+
+function createCrawlJob() {
+  pruneCrawlJobs();
+  const jobId = randomUUID();
+  const createdAt = new Date().toISOString();
+  crawlJobs.set(jobId, {
+    id: jobId,
+    status: "queued",
+    createdAt,
+    updatedAt: createdAt,
+    finishedAt: "",
+    progress: makeJobProgress({ phase: "queued", message: "Queued", percent: 0 }),
+    result: null,
+    error: ""
+  });
+  return jobId;
+}
+
+function updateCrawlJob(jobId, patch = {}) {
+  const job = crawlJobs.get(jobId);
+  if (!job) return null;
+
+  const updatedAt = new Date().toISOString();
+  const next = {
+    ...job,
+    ...patch,
+    updatedAt
+  };
+
+  if (patch.progress) {
+    next.progress = {
+      ...job.progress,
+      ...patch.progress,
+      updatedAt
+    };
+  }
+
+  if (patch.status === "completed" || patch.status === "failed") {
+    next.finishedAt = updatedAt;
+  }
+
+  crawlJobs.set(jobId, next);
+  return next;
+}
 
 
 function canonicalizePathname(pathname) {
@@ -1282,26 +1384,43 @@ app.post("/api/auth", (req, res) => {
   return res.json({ ok: true, pinRequired: false });
 });
 
-app.post("/api/crawl", async (req, res) => {
-  const url = String(req.body?.url || "").trim();
-  const options = { ...DEFAULTS, ...(req.body?.options || {}) };
+async function executeCrawlRequest(body, onProgress = () => {}) {
+  const url = String(body?.url || "").trim();
+  const options = { ...DEFAULTS, ...(body?.options || {}) };
   delete options.languagePrefixes;
   options.patternMatchFilter = String(options.patternMatchFilter || "").trim();
   options.pathLimits = sanitizePathLimits(options.pathLimits);
   const excludePathMatchers = buildExcludeMatchers(options.excludePaths);
   const userAgent = "SiteCrawler/1.0";
+  const emitProgress = createProgressEmitter(onProgress);
 
   let root;
   try {
     root = new URL(url);
   } catch {
-    return res.status(400).json({ error: "Invalid URL" });
+    const err = new Error("Invalid URL");
+    err.statusCode = 400;
+    throw err;
   }
 
   const origin = root.origin;
   const rootHost = root.host;
   const start = normalizeUrl(url, null, options);
-  if (!start) return res.status(400).json({ error: "Invalid URL" });
+  if (!start) {
+    const err = new Error("Invalid URL");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  emitProgress({
+    phase: "setup",
+    message: "Loading robots.txt and sitemap",
+    percent: 2,
+    pagesCrawled: 0,
+    pagesQueued: 0,
+    pagesDiscovered: 0,
+    maxPages: options.maxPages
+  }, true);
 
   const startLanguagePrefix = inferStartLanguagePrefix(start);
   let startPathScope = "/";
@@ -1314,6 +1433,15 @@ app.post("/api/crawl", async (req, res) => {
   const startScope = !startPathScope || startPathScope === "/" ? "/" : (startPathScope.endsWith("/") ? startPathScope.slice(0, -1) : startPathScope);
 
   const robots = await fetchRobots(origin, options.timeoutMs, userAgent);
+  emitProgress({
+    phase: "discovery",
+    message: "Priming crawl queue",
+    percent: 5,
+    pagesCrawled: 0,
+    pagesQueued: 0,
+    pagesDiscovered: 0,
+    maxPages: options.maxPages
+  }, true);
 
   const toVisitQueue = [];
   const toVisitSet = new Set();
@@ -1321,9 +1449,23 @@ app.post("/api/crawl", async (req, res) => {
   const blockedByPathLimit = new Set();
   const discovered = new Set();
   const navigationEntries = [];
+  let pagesCrawled = 0;
 
   const pathLimitCounters = new Map();
   const pathLimitSkipped = {};
+
+  function reportCrawlProgress(message = "Crawling pages", force = false) {
+    const crawlPercent = Math.min(70, 8 + Math.round((pagesCrawled / Math.max(1, options.maxPages)) * 62));
+    emitProgress({
+      phase: "crawl",
+      message,
+      percent: crawlPercent,
+      pagesCrawled,
+      pagesQueued: toVisitQueue.length,
+      pagesDiscovered: discovered.size,
+      maxPages: options.maxPages
+    }, force);
+  }
 
   function enqueue(urlString) {
     if (visited.has(urlString) || blockedByPathLimit.has(urlString) || toVisitSet.has(urlString)) return;
@@ -1362,6 +1504,7 @@ app.post("/api/crawl", async (req, res) => {
   } else {
     enqueue(start);
   }
+  reportCrawlProgress(sitemapUrls.length ? "Queued sitemap URLs" : "Queued start URL", true);
 
   const records = new Map();
 
@@ -1410,6 +1553,8 @@ app.post("/api/crawl", async (req, res) => {
     if (options.ignoreJobPages && isJobDetailPage(pathnameLower)) return;
 
     const r = await fetchText(currentUrl, options.timeoutMs, robots, userAgent);
+    pagesCrawled += 1;
+    reportCrawlProgress(`Crawled ${pagesCrawled} page${pagesCrawled === 1 ? "" : "s"}`);
 
     const existing = records.get(currentUrl) || {
       url: currentUrl,
@@ -1530,6 +1675,15 @@ app.post("/api/crawl", async (req, res) => {
     batch.forEach((u) => toVisitSet.delete(u));
     await concurrencyMap(batch, options.concurrency, processOne);
   }
+  emitProgress({
+    phase: "crawl",
+    message: "Page discovery complete",
+    percent: 70,
+    pagesCrawled,
+    pagesQueued: 0,
+    pagesDiscovered: discovered.size,
+    maxPages: options.maxPages
+  }, true);
 
   const urls = Array.from(discovered).sort();
 
@@ -1540,6 +1694,7 @@ app.post("/api/crawl", async (req, res) => {
     });
 
     if (missingStatus.length) {
+      let missingStatusDone = 0;
       await concurrencyMap(missingStatus, Math.min(options.concurrency, 6), async (u) => {
         const s = await quickStatus(u, options.timeoutMs, robots, userAgent);
         const existing = records.get(u) || {
@@ -1562,6 +1717,16 @@ app.post("/api/crawl", async (req, res) => {
         existing.redirectChain = s.redirectChain || existing.redirectChain || [u];
         existing.redirectSteps = s.redirectSteps || existing.redirectSteps || [];
         records.set(u, existing);
+        missingStatusDone += 1;
+        emitProgress({
+          phase: "status",
+          message: `Checked statuses ${missingStatusDone}/${missingStatus.length}`,
+          percent: Math.min(76, 70 + Math.round((missingStatusDone / Math.max(1, missingStatus.length)) * 6)),
+          pagesCrawled,
+          pagesQueued: 0,
+          pagesDiscovered: discovered.size,
+          maxPages: options.maxPages
+        });
         return true;
       });
     }
@@ -1597,6 +1762,19 @@ app.post("/api/crawl", async (req, res) => {
     }
   }
 
+  let navigationAuditDone = 0;
+  emitProgress({
+    phase: "audit",
+    message: `Validated navigation 0/${navigationEntries.length || 0}`,
+    percent: 76,
+    pagesCrawled,
+    pagesQueued: 0,
+    pagesDiscovered: discovered.size,
+    maxPages: options.maxPages,
+    auditEntriesTested: 0,
+    auditEntriesTotal: navigationEntries.length
+  }, true);
+
   const auditedNavigationEntries = await concurrencyMap(
     navigationEntries,
     Math.min(options.concurrency, 8),
@@ -1618,7 +1796,7 @@ app.post("/api/crawl", async (req, res) => {
       record.apiChecks = matchedRecord?.apiChecks || [];
       record.apiFailures = matchedRecord?.apiFailures || [];
       const redirectAuditEntry = buildRedirectAuditEntry(entry, result);
-      return {
+      const auditedEntry = {
         originalUrl: entry.originalUrl,
         referrerPage: entry.referrerPage,
         sourceType: entry.sourceType,
@@ -1642,6 +1820,19 @@ app.post("/api/crawl", async (req, res) => {
         apiFailures: record.apiFailures,
         classification: classifyRecord(record)
       };
+      navigationAuditDone += 1;
+      emitProgress({
+        phase: "audit",
+        message: `Validated navigation ${navigationAuditDone}/${navigationEntries.length || 0}`,
+        percent: Math.min(88, 76 + Math.round((navigationAuditDone / Math.max(1, navigationEntries.length || 1)) * 12)),
+        pagesCrawled,
+        pagesQueued: 0,
+        pagesDiscovered: discovered.size,
+        maxPages: options.maxPages,
+        auditEntriesTested: navigationAuditDone,
+        auditEntriesTotal: navigationEntries.length
+      });
+      return auditedEntry;
     }
   );
 
@@ -1710,6 +1901,17 @@ app.post("/api/crawl", async (req, res) => {
 
   const softFailureSummary = summarizeSoftFailureAudit(softFailureEntries);
   const patternAudit = buildPatternAudit(out, options.patternMatchFilter);
+  emitProgress({
+    phase: "reporting",
+    message: "Building audit reports",
+    percent: 90,
+    pagesCrawled,
+    pagesQueued: 0,
+    pagesDiscovered: discovered.size,
+    maxPages: options.maxPages,
+    auditEntriesTested: auditEntries.length,
+    auditEntriesTotal: navigationEntries.length
+  }, true);
 
   let parameterAudit = {
     summary: {
@@ -1743,6 +1945,7 @@ app.post("/api/crawl", async (req, res) => {
       }
     }
 
+    let parameterChecksDone = 0;
     await concurrencyMap(parameterJobs, Math.min(options.concurrency, 8), async (job) => {
       const res = await quickStatus(job.variantUrl, options.timeoutMs, robots, userAgent);
       const paramsPreserved = hasExpectedParameter(res.finalUrl || job.variantUrl, job.variation);
@@ -1767,6 +1970,20 @@ app.post("/api/crawl", async (req, res) => {
         unexpectedRedirect,
         hasIssue
       });
+      parameterChecksDone += 1;
+      emitProgress({
+        phase: "parameter_audit",
+        message: `Checked parameters ${parameterChecksDone}/${parameterJobs.length}`,
+        percent: Math.min(98, 90 + Math.round((parameterChecksDone / Math.max(1, parameterJobs.length)) * 8)),
+        pagesCrawled,
+        pagesQueued: 0,
+        pagesDiscovered: discovered.size,
+        maxPages: options.maxPages,
+        auditEntriesTested: auditEntries.length,
+        auditEntriesTotal: navigationEntries.length,
+        parameterChecksDone,
+        parameterChecksTotal: parameterJobs.length
+      });
       return true;
     });
 
@@ -1790,10 +2007,11 @@ app.post("/api/crawl", async (req, res) => {
     impactAudit
   );
 
-  return res.json({
+  const response = {
     startUrl: start,
     origin,
     counts: {
+      crawled: pagesCrawled,
       visited: visited.size,
       returned: out.length,
       fromSitemap: sitemapUrls.length > 0,
@@ -1822,6 +2040,87 @@ app.post("/api/crawl", async (req, res) => {
     patternAudit,
     parameterAudit,
     issueReport
+  };
+
+  emitProgress({
+    phase: "complete",
+    message: "Crawl complete",
+    percent: 100,
+    pagesCrawled,
+    pagesQueued: 0,
+    pagesDiscovered: discovered.size,
+    maxPages: options.maxPages,
+    auditEntriesTested: auditEntries.length,
+    auditEntriesTotal: navigationEntries.length,
+    parameterChecksDone: parameterAudit.summary?.total || 0,
+    parameterChecksTotal: parameterAudit.summary?.total || 0
+  }, true);
+
+  return response;
+}
+
+app.post("/api/crawl", async (req, res) => {
+  try {
+    const result = await executeCrawlRequest(req.body);
+    return res.json(result);
+  } catch (error) {
+    return res.status(error?.statusCode || 500).json({ error: error?.message || "Request failed" });
+  }
+});
+
+app.post("/api/crawl/start", async (req, res) => {
+  const jobId = createCrawlJob();
+  updateCrawlJob(jobId, {
+    status: "running",
+    progress: makeJobProgress({
+      phase: "setup",
+      message: "Starting crawl",
+      percent: 1
+    })
+  });
+
+  void executeCrawlRequest(req.body, (progress) => {
+    updateCrawlJob(jobId, { progress });
+  })
+    .then((result) => {
+      updateCrawlJob(jobId, {
+        status: "completed",
+        progress: makeJobProgress({ ...(crawlJobs.get(jobId)?.progress || {}), phase: "complete", message: "Crawl complete", percent: 100 }),
+        result,
+        error: ""
+      });
+    })
+    .catch((error) => {
+      updateCrawlJob(jobId, {
+        status: "failed",
+        progress: makeJobProgress({
+          ...(crawlJobs.get(jobId)?.progress || {}),
+          phase: "failed",
+          message: error?.message || "Crawl failed"
+        }),
+        error: error?.message || "Crawl failed"
+      });
+    });
+
+  return res.json({ jobId });
+});
+
+app.get("/api/crawl/:jobId", (req, res) => {
+  pruneCrawlJobs();
+  const job = crawlJobs.get(String(req.params?.jobId || ""));
+  if (!job) {
+    return res.status(404).json({ error: "Crawl job not found" });
+  }
+
+  return res.json({
+    jobId: job.id,
+    status: job.status,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    finishedAt: job.finishedAt,
+    progress: job.progress,
+    result: job.status === "completed" ? job.result : null,
+    error: job.error || ""
   });
 });
 

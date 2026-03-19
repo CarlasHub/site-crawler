@@ -351,11 +351,11 @@
    }
    
    /* === ORB VISUALIZATION === */
-   .heroOrb {
-     position: relative;
-     height: 220px;
-     display: grid;
-     place-items: center;
+  .heroOrb {
+    position: relative;
+    height: 220px;
+    display: grid;
+    place-items: center;
    }
    
    .ring {
@@ -404,6 +404,8 @@
     box-shadow: 0 24px 80px rgba(0,0,0,0.45);
     position: relative;
     overflow: hidden;
+    display: grid;
+    place-items: center;
   }
   
   .orbInner {
@@ -414,6 +416,28 @@
       radial-gradient(70px 70px at 40% 30%, rgba(110,231,255,0.18), transparent 60%),
       radial-gradient(80px 80px at 70% 70%, rgba(139,92,246,0.16), transparent 60%);
     border: 1px solid rgba(255,255,255,0.10);
+  }
+
+  .orbLabel {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .orbLabel strong {
+    font-size: 32px;
+    line-height: 1;
+    color: var(--text-high);
+  }
+
+  .orbLabel span {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-mid);
   }
   
    .heroOrb.isRunning .orb {
@@ -426,11 +450,89 @@
    }
    
    /* === CONTENT PANELS === */
-   .content {
-     margin-top: 24px;
-     display: grid;
-     gap: 20px;
-   }
+  .content {
+    margin-top: 24px;
+    display: grid;
+    gap: 20px;
+  }
+
+  .progressDock {
+    position: sticky;
+    top: 78px;
+    z-index: 90;
+    margin-bottom: 20px;
+    padding: 16px 18px;
+    border-radius: 20px;
+    border: 1px solid var(--stroke2);
+    background: linear-gradient(180deg, rgba(15, 18, 27, 0.96), rgba(10, 13, 20, 0.92));
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(18px);
+  }
+
+  .progressDock.isRunning {
+    border-color: var(--stroke-accent);
+    box-shadow: var(--shadow-md), 0 0 24px -12px var(--accent-glow);
+  }
+
+  .progressDockHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .progressDockTitle {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-mid);
+  }
+
+  .progressDockMessage {
+    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-high);
+  }
+
+  .progressDockStats {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .progressBar {
+    width: 100%;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .progressFill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), #5eead4 55%, #7c3aed 100%);
+    box-shadow: 0 0 22px -8px var(--accent-glow);
+    transition: width 180ms var(--ease-out);
+  }
+
+  .progressMeta {
+    margin-top: 12px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
    
    .panel {
      border-radius: var(--radius);
@@ -990,6 +1092,10 @@
     padding-top: 88px;
   }
 
+  .shell--bookmarklet .progressDock {
+    top: 20px;
+  }
+
   .shell--bookmarklet .headerInner {
     grid-template-columns: auto 1fr;
   }
@@ -1000,6 +1106,7 @@
 
   /* === HOW TO STEPS === */
   .stepGrid {
+    margin-top: 16px;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 16px;
@@ -1035,7 +1142,6 @@
   }
 
   .noteRow {
-    margin-top: 16px;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 12px;
@@ -1091,7 +1197,7 @@
    }
    
    /* === RESPONSIVE === */
-   @media (max-width: 960px) {
+  @media (max-width: 960px) {
      .headerInner { 
        grid-template-columns: 1fr;
        gap: 12px;
@@ -1126,6 +1232,10 @@
        height: 180px;
        order: -1;
      }
+
+     .progressDock {
+       top: 134px;
+     }
      
      .orb { 
        width: 150px; 
@@ -1150,6 +1260,19 @@
    @media (max-width: 640px) {
      .main {
        padding: 20px 16px 32px;
+     }
+
+     .progressDock {
+       top: 138px;
+       padding: 14px;
+     }
+
+     .progressDockHead {
+       gap: 12px;
+     }
+
+     .progressDockStats {
+       justify-content: flex-start;
      }
      
      .panel {

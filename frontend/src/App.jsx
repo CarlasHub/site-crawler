@@ -72,6 +72,26 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function makeEmptyProgress() {
+  return {
+    phase: "idle",
+    message: "Ready",
+    percent: 0,
+    pagesCrawled: 0,
+    pagesQueued: 0,
+    pagesDiscovered: 0,
+    maxPages: 0,
+    auditEntriesTested: 0,
+    auditEntriesTotal: 0,
+    parameterChecksDone: 0,
+    parameterChecksTotal: 0
+  };
+}
+
 function getEntryOriginalUrl(row) {
   return String(row?.originalUrl || row?.url || "");
 }
@@ -116,7 +136,8 @@ export default function App() {
   const [parameterAudit, setParameterAudit] = useState(false);
 
   const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [crawlJobId, setCrawlJobId] = useState("");
+  const [crawlProgress, setCrawlProgress] = useState(makeEmptyProgress);
   const [error, setError] = useState("");
   const [notices, setNotices] = useState([]);
   const [data, setData] = useState(null);
@@ -124,6 +145,7 @@ export default function App() {
   const [presets, setPresets] = useState([]);
   const [presetName, setPresetName] = useState("default");
   const fileInputRef = useRef(null);
+  const activeJobRef = useRef("");
   const [isBookmarklet, setIsBookmarklet] = useState(false);
   const [urlMatchPattern, setUrlMatchPattern] = useState("");
 
@@ -183,22 +205,10 @@ export default function App() {
   }, [url, excludePaths, pathLimits, maxPages, concurrency, includeQuery, ignoreJobPages, brokenLinkCheck, parameterAudit, presetName, urlMatchPattern]);
 
   useEffect(() => {
-    if (!loading) {
-      setProgress(100);
-      return;
-    }
-
-    setProgress(6);
-    const startedAt = Date.now();
-    const tick = setInterval(() => {
-      const elapsed = Date.now() - startedAt;
-      const cap = 92;
-      const next = Math.min(cap, 6 + Math.floor(elapsed / 220));
-      setProgress((p) => (p < next ? next : p));
-    }, 200);
-
-    return () => clearInterval(tick);
-  }, [loading]);
+    return () => {
+      activeJobRef.current = "";
+    };
+  }, []);
 
   const excludePathList = useMemo(() => {
     return excludePaths
@@ -221,6 +231,13 @@ export default function App() {
   const patternAuditSummary = data?.patternAudit?.summary || null;
   const parameterAuditEntries = data?.parameterAudit?.entries || [];
   const parameterAuditSummary = data?.parameterAudit?.summary || null;
+  const progress = clamp(Number(crawlProgress?.percent || 0), 0, 100);
+  const pagesCrawled = Number(crawlProgress?.pagesCrawled || data?.counts?.crawled || 0);
+  const pagesQueued = Number(crawlProgress?.pagesQueued || 0);
+  const pagesDiscovered = Number(crawlProgress?.pagesDiscovered || data?.counts?.returned || 0);
+  const progressPhase = String(crawlProgress?.phase || "idle").replace(/_/g, " ");
+  const progressMessage = String(crawlProgress?.message || (loading ? "Running crawl" : "Ready"));
+  const showProgressDock = loading || !!data;
 
   const matchedUrls = useMemo(() => {
     const pattern = urlMatchPattern.trim();
@@ -355,6 +372,9 @@ export default function App() {
     setError("");
     setData(null);
     setNotices([]);
+    setCrawlJobId("");
+    setCrawlProgress(makeEmptyProgress());
+    activeJobRef.current = "";
 
     const trimmed = url.trim();
     if (!trimmed) {
@@ -369,8 +389,16 @@ export default function App() {
     }
 
     setLoading(true);
+    setCrawlProgress({
+      ...makeEmptyProgress(),
+      phase: "setup",
+      message: "Starting crawl",
+      percent: 1,
+      maxPages: clamp(Number(maxPages || 300), 10, 5000)
+    });
+
     try {
-      const res = await fetch("/api/crawl", {
+      const res = await fetch("/api/crawl/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -397,13 +425,56 @@ export default function App() {
         return;
       }
 
-      setData(json);
-      pushNotice("success", "Crawl completed.");
+      const jobId = String(json?.jobId || "").trim();
+      if (!jobId) {
+        throw new Error("Crawl job did not start.");
+      }
+
+      activeJobRef.current = jobId;
+      setCrawlJobId(jobId);
+
+      while (activeJobRef.current === jobId) {
+        const statusRes = await fetch(`/api/crawl/${jobId}`, { cache: "no-store" });
+        const statusJson = await statusRes.json();
+
+        if (!statusRes.ok) {
+          throw new Error(statusJson?.error || "Progress request failed");
+        }
+
+        if (statusJson?.progress) {
+          setCrawlProgress((prev) => ({
+            ...prev,
+            ...statusJson.progress
+          }));
+        }
+
+        if (statusJson?.status === "completed") {
+          setData(statusJson.result || null);
+          setCrawlProgress((prev) => ({
+            ...prev,
+            ...(statusJson.progress || {}),
+            phase: "complete",
+            message: "Crawl complete",
+            percent: 100
+          }));
+          pushNotice("success", "Crawl completed.");
+          setLoading(false);
+          activeJobRef.current = "";
+          return;
+        }
+
+        if (statusJson?.status === "failed") {
+          throw new Error(statusJson?.error || "Crawl failed");
+        }
+
+        await sleep(450);
+      }
+    } catch (err) {
+      const message = String(err?.message || "Network error");
+      setError(message);
+      pushNotice("error", message);
       setLoading(false);
-    } catch {
-      setError("Network error");
-      pushNotice("error", "Network error");
-      setLoading(false);
+      activeJobRef.current = "";
     }
   }
 
@@ -497,7 +568,8 @@ export default function App() {
       broken,
       skippedByPathLimit,
       fromSitemap: !!data.counts?.fromSitemap,
-      visited: data.counts?.visited || 0
+      visited: data.counts?.visited || 0,
+      crawled: data.counts?.crawled || data.counts?.visited || 0
     };
   }, [data, pageUrls]);
 
@@ -536,6 +608,51 @@ export default function App() {
       </header>
 
       <main id="main" className="main">
+        {showProgressDock ? (
+          <div className={`progressDock${loading ? " isRunning" : ""}`} aria-live="polite">
+            <div className="progressDockHead">
+              <div>
+                <div className="progressDockTitle">{loading ? "Crawl in progress" : "Last crawl"}</div>
+                <div className="progressDockMessage">{progressMessage}</div>
+              </div>
+              <div className="progressDockStats">
+                <span className="chip">{progress}%</span>
+                <span className="chip">Pages crawled {pagesCrawled}</span>
+                {pagesDiscovered ? <span className="chip">Discovered {pagesDiscovered}</span> : null}
+                {crawlProgress?.auditEntriesTotal ? (
+                  <span className="chip">
+                    Navigation {Number(crawlProgress.auditEntriesTested || 0)}/{Number(crawlProgress.auditEntriesTotal || 0)}
+                  </span>
+                ) : null}
+                {crawlProgress?.parameterChecksTotal ? (
+                  <span className="chip">
+                    Parameters {Number(crawlProgress.parameterChecksDone || 0)}/{Number(crawlProgress.parameterChecksTotal || 0)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <div
+              className="progressBar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+              aria-valuetext={`${progress}% complete, ${pagesCrawled} pages crawled`}
+            >
+              <div className="progressFill" style={{ width: `${progress}%` }} />
+            </div>
+
+            <div className="progressMeta">
+              <span>{progressPhase}</span>
+              <span>{pagesCrawled} pages crawled</span>
+              <span>{pagesQueued} queued</span>
+              <span>{pagesDiscovered} discovered</span>
+              {crawlJobId ? <span>Job {crawlJobId.slice(0, 8)}</span> : null}
+            </div>
+          </div>
+        ) : null}
+
         <section className="hero" aria-label="Overview">
           <div className="heroGrid">
             <div className="heroCopy">
@@ -562,11 +679,15 @@ export default function App() {
                 aria-live="polite"
                 style={{ "--p": `${progress}%` }}
               >
-                <span className="srOnly">{loading ? "Crawling in progress" : "Crawl complete"}</span>
+                <span className="srOnly">{loading ? "Crawling in progress" : data ? "Crawl complete" : "Ready"}</span>
               </div>
 
               <div className="orb" aria-hidden="true">
                 <div className="orbInner" />
+                <div className="orbLabel">
+                  <strong>{progress}%</strong>
+                  <span>{pagesCrawled} pages</span>
+                </div>
               </div>
               <div className="orbGlow" aria-hidden="true" />
             </div>
@@ -592,6 +713,15 @@ export default function App() {
             </div>
 
             <div className="panelBody">
+              <div className="noteRow">
+                <div className="noteCard">
+                  <strong>Tip:</strong> Enable “Broken link quick check” to see HTTP status codes and spot 404s quickly.
+                </div>
+                <div className="noteCard">
+                  <strong>Bookmarklet:</strong> Use `docs/bookmarklet.js` to run the crawler in-page on any site.
+                </div>
+              </div>
+
               <div className="stepGrid" role="list">
                 <div className="stepCard" role="listitem">
                   <div className="stepNum">1</div>
@@ -633,15 +763,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-
-              <div className="noteRow">
-                <div className="noteCard">
-                  <strong>Tip:</strong> Enable “Broken link quick check” to see HTTP status codes and spot 404s quickly.
-                </div>
-                <div className="noteCard">
-                  <strong>Bookmarklet:</strong> Use `docs/bookmarklet.js` to run the crawler in-page on any site.
-                </div>
-              </div>
             </div>
           </section>
 
@@ -651,6 +772,7 @@ export default function App() {
               <div className="panelMeta">
                 {summary ? (
                   <>
+                    <span className="chip">Crawled {summary.crawled}</span>
                     <span className="chip">Visited {summary.visited}</span>
                     <span className="chip">Returned {summary.total}</span>
                     <span className="chip">Matched {matchedUrls.length}</span>
@@ -685,7 +807,7 @@ export default function App() {
                   onChange={(e) => setExcludePaths(e.target.value)}
                   rows={6}
                 />
-                <p className="help">Only lines starting with / are used. Single segment paths like /category match anywhere in the path, including /en/category. Single segment paths like /category match anywhere in the path, including /en/category. Single segment paths like /category match anywhere in the path, including /en/category.</p>
+                <p className="help">Only lines starting with `/` are used. Single-segment paths like `/category` match anywhere in the path, including `/en/category`.</p>
               </div>
 
               <div className="field">
