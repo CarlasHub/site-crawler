@@ -278,7 +278,7 @@
       <section id="bookmarklet" class="section grid-2">
         <div class="card">
           <h3>Bookmarklet setup (Cat Crawler)</h3>
-          <p>Run the crawler inside any page you’re visiting, using a floating in-page panel.</p>
+          <p>Run the crawler inside any page you’re visiting, using a draggable, resizable in-page panel.</p>
           <ol class="list">
             <li>Drag the <code>Drag Cat Crawler 😼</code> button above to your bookmarks bar.</li>
             <li>Open any page you want to inspect.</li>
@@ -316,32 +316,9 @@
       (function () {
         var bookmarklet =
           '(function(){' +
-          'const APP_ORIGIN=\"https://site-crawler-909296093050.europe-west2.run.app\";' +
-          'const ROOT_ID=\"cat-crawler-root\";' +
-          'const existing=document.getElementById(ROOT_ID);' +
-          'if(existing){existing.remove();return;}' +
-          'const root=document.createElement(\"div\");root.id=ROOT_ID;' +
-          'const style=document.createElement(\"style\");' +
-          'style.textContent=' +
-            '\"#\"+ROOT_ID+\"{position:fixed;right:16px;bottom:16px;z-index:2147483647;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;}\"+' +
-            '\"#\"+ROOT_ID+\" .cat-crawler-button{width:56px;height:56px;border-radius:999px;border:2px solid #1a1a1a;background:#0f0f0f url(\\\\\\\"\"+APP_ORIGIN+\"/cat.png\\\\\\\") center/cover no-repeat;box-shadow:0 8px 24px rgba(0,0,0,0.35);cursor:pointer;}\"+' +
-            '\"#\"+ROOT_ID+\" .cat-crawler-panel{position:fixed;right:16px;bottom:88px;width:min(520px,92vw);height:min(80vh,680px);border-radius:16px;border:1px solid rgba(0,0,0,0.2);background:#0b0b0b;box-shadow:0 18px 48px rgba(0,0,0,0.45);overflow:auto;display:none;resize:both;min-width:320px;min-height:280px;}\"+' +
-            '\"#\"+ROOT_ID+\" .cat-crawler-panel.is-open{display:block;}\"+' +
-            '\"#\"+ROOT_ID+\" .cat-crawler-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#111;color:#fff;font-weight:700;font-size:13px;}\"+' +
-            '\"#\"+ROOT_ID+\" .cat-crawler-close{border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;padding:6px 10px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:600;}\"+' +
-            '\"#\"+ROOT_ID+\" iframe{width:100%;height:calc(100% - 44px);border:0;background:#0b0b0b;}\";' +
-          'const button=document.createElement(\"button\");button.className=\"cat-crawler-button\";button.title=\"Cat Crawler\";button.type=\"button\";' +
-          'const panel=document.createElement(\"div\");panel.className=\"cat-crawler-panel\";' +
-          'const bar=document.createElement(\"div\");bar.className=\"cat-crawler-bar\";bar.textContent=\"Cat Crawler\";' +
-          'const closeBtn=document.createElement(\"button\");closeBtn.className=\"cat-crawler-close\";closeBtn.type=\"button\";closeBtn.textContent=\"Close\";' +
-          'const iframe=document.createElement(\"iframe\");' +
-          'const targetUrl=encodeURIComponent(window.location.href);' +
-          'iframe.src=APP_ORIGIN+\"/?mode=bookmarklet&url=\"+targetUrl;iframe.title=\"Cat Crawler\";' +
-          'closeBtn.addEventListener(\"click\",function(){panel.classList.remove(\"is-open\");});' +
-          'button.addEventListener(\"click\",function(){panel.classList.toggle(\"is-open\");});' +
-          'bar.appendChild(closeBtn);panel.appendChild(bar);panel.appendChild(iframe);' +
-          'root.appendChild(style);root.appendChild(button);root.appendChild(panel);' +
-          'document.body.appendChild(root);' +
+          'var script=document.createElement(\"script\");' +
+          'script.src=\"https://carlashub.github.io/site-crawler/bookmarklet.js?t=\"+Date.now();' +
+          'document.body.appendChild(script);' +
           '})();';
 
         var link = document.getElementById('bookmarkletLink');
