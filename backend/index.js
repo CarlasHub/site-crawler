@@ -417,6 +417,18 @@ async function quickStatus(url, timeoutMs, robots, userAgent) {
   };
 }
 
+function toQuickStatusResult(record, fallbackUrl) {
+  return {
+    status: record?.status,
+    finalUrl: record?.finalUrl || fallbackUrl,
+    blockedByRobots: !!record?.blockedByRobots,
+    redirectChain: record?.redirectChain || [fallbackUrl],
+    redirectSteps: record?.redirectSteps || [],
+    loopDetected: !!record?.loopDetected,
+    maxRedirectsExceeded: !!record?.maxRedirectsExceeded
+  };
+}
+
 async function fetchWithRedirects(url, { method = "GET", timeoutMs, robots, userAgent, accept }) {
   const redirectChain = [url];
   const redirectSteps = [];
@@ -824,7 +836,7 @@ function extractApiCandidates(html) {
   return Array.from(candidates).slice(0, 8);
 }
 
-async function probeApiCandidates(pageUrl, candidates, timeoutMs, robots, userAgent, sameHostOnly, rootHost) {
+async function probeApiCandidates(pageUrl, candidates, getQuickStatus, sameHostOnly, rootHost) {
   const jobs = (Array.isArray(candidates) ? candidates : [])
     .map((candidate) => {
       try {
@@ -839,7 +851,7 @@ async function probeApiCandidates(pageUrl, candidates, timeoutMs, robots, userAg
     .filter(Boolean);
 
   const results = await concurrencyMap(jobs, Math.min(4, jobs.length || 1), async (job) => {
-    const res = await quickStatus(job.resolvedUrl, timeoutMs, robots, userAgent);
+    const res = await getQuickStatus(job.resolvedUrl);
     return {
       source: job.candidate,
       resolvedUrl: job.resolvedUrl,
@@ -853,7 +865,7 @@ async function probeApiCandidates(pageUrl, candidates, timeoutMs, robots, userAg
   return results.filter(Boolean);
 }
 
-async function analyzeSoftFailurePage(pageUrl, html, timeoutMs, robots, userAgent, sameHostOnly, rootHost) {
+async function analyzeSoftFailurePage(pageUrl, html, getQuickStatus, sameHostOnly, rootHost) {
   const $ = cheerio.load(html || "");
   const title = collapseWhitespace($("title").first().text());
   const bodyText = getVisiblePageText(html);
@@ -871,7 +883,7 @@ async function analyzeSoftFailurePage(pageUrl, html, timeoutMs, robots, userAgen
   const errorTextMatches = detectErrorTextMatches(`${title}\n${bodyText.slice(0, 4000)}`);
   const apiCandidates = extractApiCandidates(html);
   const apiChecks = apiCandidates.length
-    ? await probeApiCandidates(pageUrl, apiCandidates, timeoutMs, robots, userAgent, sameHostOnly, rootHost)
+    ? await probeApiCandidates(pageUrl, apiCandidates, getQuickStatus, sameHostOnly, rootHost)
     : [];
   const apiFailures = apiChecks.filter((entry) => entry.failed);
 
@@ -1507,6 +1519,41 @@ async function executeCrawlRequest(body, onProgress = () => {}) {
   reportCrawlProgress(sitemapUrls.length ? "Queued sitemap URLs" : "Queued start URL", true);
 
   const records = new Map();
+  const quickStatusCache = new Map();
+
+  async function getQuickStatusCached(urlString) {
+    const existingRecord = records.get(urlString);
+    if (existingRecord && existingRecord.status !== null && existingRecord.status !== undefined) {
+      return toQuickStatusResult(existingRecord, urlString);
+    }
+
+    if (quickStatusCache.has(urlString)) {
+      return quickStatusCache.get(urlString);
+    }
+
+    const pending = quickStatus(urlString, options.timeoutMs, robots, userAgent)
+      .then((result) => ({
+        status: result.status,
+        finalUrl: result.finalUrl || urlString,
+        blockedByRobots: !!result.blockedByRobots,
+        redirectChain: result.redirectChain || [urlString],
+        redirectSteps: result.redirectSteps || [],
+        loopDetected: !!result.loopDetected,
+        maxRedirectsExceeded: !!result.maxRedirectsExceeded
+      }))
+      .catch(() => ({
+        status: 0,
+        finalUrl: urlString,
+        blockedByRobots: false,
+        redirectChain: [urlString],
+        redirectSteps: [],
+        loopDetected: false,
+        maxRedirectsExceeded: false
+      }));
+
+    quickStatusCache.set(urlString, pending);
+    return pending;
+  }
 
   async function processOne(currentUrl) {
     if (visited.has(currentUrl) || blockedByPathLimit.has(currentUrl)) return;
@@ -1581,9 +1628,7 @@ async function executeCrawlRequest(body, onProgress = () => {}) {
       const softFailure = await analyzeSoftFailurePage(
         existing.finalUrl || currentUrl,
         r.text,
-        options.timeoutMs,
-        robots,
-        userAgent,
+        getQuickStatusCached,
         options.sameHostOnly,
         rootHost
       );
@@ -1696,7 +1741,7 @@ async function executeCrawlRequest(body, onProgress = () => {}) {
     if (missingStatus.length) {
       let missingStatusDone = 0;
       await concurrencyMap(missingStatus, Math.min(options.concurrency, 6), async (u) => {
-        const s = await quickStatus(u, options.timeoutMs, robots, userAgent);
+        const s = await getQuickStatusCached(u);
         const existing = records.get(u) || {
           url: u,
           finalUrl: u,
@@ -1779,7 +1824,7 @@ async function executeCrawlRequest(body, onProgress = () => {}) {
     navigationEntries,
     Math.min(options.concurrency, 8),
     async (entry) => {
-      const result = await quickStatus(entry.originalUrl, options.timeoutMs, robots, userAgent);
+      const result = await getQuickStatusCached(entry.originalUrl);
       const record = {
         url: entry.originalUrl,
         finalUrl: result.finalUrl || entry.originalUrl,
@@ -1947,7 +1992,7 @@ async function executeCrawlRequest(body, onProgress = () => {}) {
 
     let parameterChecksDone = 0;
     await concurrencyMap(parameterJobs, Math.min(options.concurrency, 8), async (job) => {
-      const res = await quickStatus(job.variantUrl, options.timeoutMs, robots, userAgent);
+      const res = await getQuickStatusCached(job.variantUrl);
       const paramsPreserved = hasExpectedParameter(res.finalUrl || job.variantUrl, job.variation);
       const paramsDropped = !paramsPreserved;
       const unexpectedRedirect =
