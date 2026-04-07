@@ -1,224 +1,270 @@
 # Cat Crawler
 
-> Crawl and validate websites for broken links, redirects, parameter handling, soft failures, URL patterns, and impact.
+> Crawl a site, test internal navigation, and review redirects, parameter handling, soft failures, and URL-pattern issues in one place.
 
-![UI screenshot](docs/screenshot.png)
+![Cat Crawler screenshot](docs/screenshot.png)
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Node](https://img.shields.io/badge/node-22%2B-brightgreen)
+![Node](https://img.shields.io/badge/node-22.x-brightgreen)
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 
-## Table of contents
-- Features
-- Live demo
-- Tech stack
-- How it works
-- Architecture diagram
-- Functionality deep-dive
-- Installation and setup
-- API reference
-- Configuration and environment variables
-- Deploy to Google Cloud Run
-- Performance and roadmap
-- Bookmarklet (Cat Crawler)
-- GitHub Pages (Landing)
+## What Cat Crawler Is
 
----
+Cat Crawler is a React frontend plus Node.js backend for website crawl and navigation validation.
 
-## Features
-- Crawl internal pages from a homepage URL
-- Sitemap-first discovery when sitemap.xml is available
-- robots.txt respected before fetching any URL
+It is designed for:
+- internal site QA
+- launch and regression checks
+- redirect and routing reviews
+- large-site spot checks where a manual click-through would miss issues
+
+The main UI starts a background crawl job, polls for progress, and then renders the result as a grouped report.
+
+There is also an optional bookmarklet. The bookmarklet does not perform the crawl itself. It opens the deployed Cat Crawler app in a floating panel and passes the current page URL into the app as the starting URL.
+
+Public docs and installer:
+- GitHub Pages: [https://carlashub.github.io/site-crawler/](https://carlashub.github.io/site-crawler/)
+
+## What It Is Good For
+
+- Checking internal links and form actions from a real starting URL
+- Verifying redirect behaviour, including multi-hop chains and dropped query parameters
+- Reviewing query-driven routes with parameter audit enabled
+- Finding pages that return `200` but still look broken because content or API requests failed
+- Spotting duplicate-looking URL structures and inconsistent naming
+- Saving repeatable crawl presets for the same client or site area
+
+## Key Features
+
+- Sitemap-first discovery from `robots.txt` sitemap entries or default `sitemap.xml`
+- `robots.txt` enforcement before crawling
 - Same-host crawling with optional scope limited to the start path
-- Navigation audit across both anchor links and form actions
-- Exclude paths using relative paths, one per line
-- Language-agnostic crawl limits by path (for example `/job` also matches `/en/job`, `/fr/job`)
-- Ignore job pages by default to prevent job-heavy sections from flooding results
-- Redirect resolution with full redirect chains, per-step status codes, and final URL stored
-- Optional broken link quick check with HTTP status recording
-- Parameter audit for `?test=1`, `?page=2`, and `?filter=value`
-- Soft-failure detection for successful pages with missing content, error text, or failed API/XHR endpoints
-- URL pattern audit for duplicate structures, legacy/current paths, and inconsistent naming
-- Impact analysis for broken and redirected URLs based on repetition, referrers, and core-flow heuristics
-- Consolidated validation report with broken URLs, redirect issues, parameter issues, soft failures, and impact analysis
-- Duplicate content candidates detection, including querystring and language variants
-- Client presets saved in localStorage, export and import presets as JSON
-- Bookmarklet opens in a draggable, resizable in-page panel with 4-corner resize handles
-- Glass UI with progress ring and animated orb during crawl
+- Excluded-path rules and language-agnostic per-path crawl limits
+- Optional job-page suppression for noisy recruitment sections
+- Optional broken-link quick check with HTTP status recording
+- Optional parameter audit for query-driven routes
+- Redirect audit with chain details, loops, multi-hop chains, parameter loss, and irrelevant destinations
+- Soft-failure audit for successful pages that still fail functionally
+- URL pattern audit for duplicate structures, legacy/current path pairs, and inconsistent naming
+- Impact audit to help prioritise repeated or core-flow issues
+- TXT and CSV export from the rendered audit report
+- Preset save, export, and import in the browser
+- Optional bookmarklet runner for opening the app from the page you are already viewing
 
----
+## What The Bookmarklet Does
 
-## Live demo
+The bookmarklet lives in [`docs/bookmarklet.js`](docs/bookmarklet.js).
 
-This project is deployed on a personal Cloud Run host:
+Its current behaviour is:
+- inject a floating launcher and panel into the current page
+- open the Cat Crawler app in an iframe
+- pass the current page URL as the `url` query parameter
+- run the app in bookmarklet mode so the UI uses the bookmarklet shell
 
-https://site-crawler-989268314020.europe-west2.run.app/
+The bookmarklet requires a valid app origin. The public docs site builds the bookmarklet install link from [`docs/config.js`](docs/config.js) and [`docs/install.js`](docs/install.js). For local development the tracked config points at `http://localhost:8080`. For staging or production releases, regenerate that config before publishing the docs.
 
-For production use, deploy to **your own** Cloud Run service and update `APP_ORIGIN` in `docs/bookmarklet.js`.
+## Current Architecture And Run Model
 
----
+High-level flow:
+1. The frontend submits a crawl job to `POST /api/crawl/start`.
+2. The backend validates the request and creates a background crawl job.
+3. The frontend polls `GET /api/crawl/:jobId` for progress and final results.
+4. The frontend renders grouped audit sections and offers TXT or CSV export.
 
-## Tech stack
+Runtime components:
+- `frontend/`: React application served as a built Vite SPA
+- `backend/`: Express API and crawl engine
+- `docs/`: GitHub Pages docs site and bookmarklet loader
 
-### Frontend
-- React 18
-- Vite 5
-- Vanilla CSS
-- Browser APIs: localStorage and sessionStorage
+Current background-job model:
+- local development defaults to file-backed job state
+- staging and production must use Firestore-backed job state
+- the UI depends on the background-job endpoints for normal use
 
-### Backend
-- Node.js 22+
-- Express
-- Cheerio for HTML parsing and link extraction
-- robots-parser for robots.txt enforcement
-- Built-in fetch and AbortController for HTTP requests and timeouts
+## Current Deployment Model And Constraints
 
-### Infrastructure
-- Docker
-- Google Cloud Run
+Current supported runtime contract:
+- Node.js `22.x`
 
----
+Important operational constraints:
+- Staging and production must use `JOB_STATE_BACKEND=firestore`
+- All production instances must share the same Firestore backend and collection prefix
+- Crawl jobs are rate-limited and capped by backend hard limits
+- Frontend controls are aligned to the backend caps: `maxPages` up to `300`, `concurrency` up to `6`
+- The crawler is for public `http(s)` targets only; internal, loopback, link-local, and metadata destinations are blocked
+- Crawling stays on the same host as the start URL
+- The bookmarklet is only a launcher for the app; it does not replace the backend
 
-## How it works
+## Quick Start
 
-### User flow
-1. Enter a homepage URL.
-2. Add optional exclude paths such as `/jobs`, `/careers`, `/admin`.
-3. Define crawl limits by path if required.
-4. Configure max pages and concurrency.
-5. Choose options such as ignoring job pages, running a broken link check, or enabling parameter audit.
+### Use The App
+
+1. Open a local run or your deployed Cat Crawler app.
+2. Enter a homepage URL such as `https://example.com`.
+3. Add any exclude paths you do not want crawled.
+4. Add optional path limits for noisy sections.
+5. Choose whether to enable broken-link checking or parameter audit.
 6. Run the crawl.
-7. Review the validation report, audit sections, and export TXT or CSV if needed.
+7. Review the grouped results and export TXT or CSV if needed.
 
-### Quick start (step-by-step)
-1. Paste the site homepage in **Homepage URL** (e.g. `https://example.com`).
-2. Add **Exclude paths** (one per line). Only lines starting with `/` are used.
-3. Add **Crawl limits by path** to cap noisy sections (e.g. `/job` max 5).
-4. Set **Max pages** and **Concurrency** based on how deep you want to go.
-5. Toggle **Ignore job pages**, **Broken link quick check**, or **Parameter audit** if needed.
-6. Click **Run crawl**, then download **TXT** or **CSV** from Results.
+### Use The Bookmarklet
 
-Tip: enable **Broken link quick check** to classify live HTTP errors, and enable **Parameter audit** when you need route-level querystring validation.
+1. Open the public docs site: [https://carlashub.github.io/site-crawler/](https://carlashub.github.io/site-crawler/)
+2. Drag the bookmarklet button to your bookmarks bar.
+3. Open the page you want to seed from.
+4. Click the bookmarklet to open Cat Crawler in a floating panel.
 
-### Landing page
-See a marketing-style overview at `docs/landing.html` (matches the in-app color scheme).
+## Main Options Explained Simply
 
-## Architecture diagram
+- `Exclude paths`
+  Prevents crawling whole sections such as `/jobs` or `/careers`.
+- `Crawl limits by path`
+  Caps how many pages are crawled under a path such as `/job`.
+- `Max pages`
+  Total crawl size cap. The UI and backend both cap this at `300`.
+- `Concurrency`
+  How many crawl workers run at once. The UI and backend both cap this at `6`.
+- `Include querystrings`
+  Keeps querystring variants in the crawl scope when appropriate.
+- `Ignore job pages`
+  Suppresses job-heavy pages by default.
+- `Broken link quick check`
+  Adds live HTTP status checking for discovered navigation targets.
+- `Parameter audit`
+  Tests how the site handles parameter variants such as `?page=2` or `?filter=value`.
+- `URL match filter`
+  Filters the rendered results after the crawl is complete.
 
-```mermaid
-flowchart TD
-  Bookmarklet["Bookmarklet optional"] --> UI["Browser UI (React + Vite SPA)"]
-  UI --> API["Express API (Node.js backend)"]
+## Output And Report Sections
 
-  API --> Crawler["Crawl engine"]
-  Crawler --> Robots["robots.txt"]
-  Crawler --> Sitemap["sitemap.xml"]
-  Crawler --> Site["Target website"]
+- `Audit report`
+  The main rendered list of crawled navigation entries with source, referrer, status, and classification.
+- `Validation report`
+  Summary view of broken URLs, redirect issues, parameter-handling issues, soft failures, and impact issues.
+- `Redirect audit`
+  Focused view of redirected navigation, including loops, multiple hops, lost params, and irrelevant destinations.
+- `Parameter audit`
+  Focused view of parameterised URLs and whether parameters were preserved, dropped, or redirected unexpectedly.
+- `Soft failures`
+  Pages that returned success but still appear broken because content or API behaviour failed.
+- `URL patterns`
+  Structural grouping for duplicate patterns, legacy/current paths, and inconsistent naming.
+- `Issue impact`
+  Prioritisation layer for repeated or core-flow issues.
+- `Duplicate content candidates`
+  Quick grouping of URL variants that may represent duplicate content.
 
-  Robots --> Crawler
-  Sitemap --> Crawler
-  Site --> Crawler
-  Crawler --> API
-  API --> UI
+## Honest Limitations And Notes
+
+- Cat Crawler does not claim to replace human QA judgement.
+- It only crawls one host per run.
+- It only crawls public `http(s)` targets that pass the outbound safety checks.
+- Soft-failure detection is heuristic by design. Treat it as review input, not an absolute verdict.
+- Pattern and impact analysis help prioritise review. They do not replace manual interpretation.
+- The GitHub Pages docs site is static. It must be configured with the correct `BOOKMARKLET_APP_ORIGIN` for a real deployed app before publishing.
+
+## Local Setup
+
+Install dependencies:
+
+```bash
+cd frontend
+npm ci
+
+cd ../backend
+npm ci
 ```
 
+Build the frontend:
 
----
-
-## Functionality deep-dive
-
-### Crawl pipeline
-- The backend validates and normalises the start URL.
-- robots.txt is fetched and enforced before crawling any URL.
-- sitemap.xml is fetched and used as the initial discovery source when available.
-- If no sitemap exists, crawling starts from the provided URL.
-
-### URL filtering and scoping
-Each discovered URL is filtered using:
-- Same-host enforcement
-- Optional restriction to the start path (for example starting at `/en` only crawls `/en/...`)
-- Excluded file extensions (images, fonts, media, PDFs, JS, CSS)
-- User-defined exclude paths
-- Optional job page detection and exclusion
-
-### Language-agnostic path limits
-- Path limits are normalised by stripping a leading language segment.
-- A rule like `/job` matches `/job`, `/en/job`, `/fr/job`, etc.
-- Each rule tracks how many URLs were crawled under that path and stops once the limit is reached.
-
-### Concurrency and progress
-- URLs are processed in batches with a configurable concurrency limit.
-- The UI displays progress using a time-based progress indicator while crawling.
-
-### Results
-- Returned URLs include original URL, final URL after redirects, HTTP status, source type, and referrer page.
-- Audit entries are classified as `valid`, `broken`, `redirect_issue`, or `soft_failure`.
-- Redirect audit highlights loops, multi-hop redirects, dropped params, and irrelevant destinations.
-- Soft-failure audit flags successful pages that still fail functionally.
-- Impact audit prioritises broken and redirect issues by repetition and core-flow importance.
-- Pattern audit groups URLs by structure and highlights inconsistencies.
-- Duplicate candidates are grouped by base URL and flagged when query or language variants exist.
-- Results can be exported as TXT or CSV.
-
----
-
-## API reference
-
-### POST `/api/crawl`
-
-Request body:
-```json
-{
-  "url": "https://example.com",
-  "options": {
-    "excludePaths": ["/jobs", "/careers"],
-    "pathLimits": [{ "path": "/job", "maxPages": 5 }],
-    "maxPages": 300,
-    "concurrency": 6,
-    "includeQuery": true,
-    "ignoreJobPages": true,
-    "brokenLinkCheck": false,
-    "parameterAudit": true,
-    "patternMatchFilter": "/jobs"
-  }
-}
+```bash
+cd frontend
+npm run build
 ```
 
-Key response sections:
-- `urls`: crawled page records
-- `audit`: validated navigation entries with referrer pages and classifications
-- `issueReport`: broken URLs, redirect issues, parameter issues, soft failures, and impact analysis
-- `impactAudit`: prioritised broken/redirect issues
-- `redirectAudit`: redirect-chain QA
-- `softFailureAudit`: successful-but-broken pages
-- `patternAudit`: structural URL grouping and inconsistency detection
-- `parameterAudit`: query-parameter handling checks
+Start the backend:
 
----
+```bash
+cd ../backend
+npm start
+```
 
-## Bookmarklet (Cat Crawler)
+Optional: regenerate the local bookmarklet docs config explicitly from the repo root:
 
-Use the crawler on the page you are currently visiting.
+```bash
+APP_ENV=local node scripts/write-public-config.mjs
+```
 
-1. Open the GitHub Pages landing page in `docs/index.html`.
-2. Drag the **Cat Crawler** bookmarklet button to your bookmarks bar.
-3. Click the bookmark on any site to open **Cat Crawler**. It auto-fills the current page URL.
-4. Drag the panel by the top bar and resize it from any of the four corners.
+The local default app origin is `http://localhost:8080`.
 
-Tip: The landing page button **Drag Cat Crawler 😼** is now a loader bookmarklet. Reinstall it once, and future bookmarklet UI updates will come from `bookmarklet.js` without another reinstall.
+## Deployment Notes
 
----
+### Docker
 
-## GitHub Pages (Landing)
+Build the production image from the repo root:
 
-The landing page lives in `docs/index.html`.
+```bash
+docker build -t cat-crawler .
+```
 
-Enable Pages:
-1. Go to **Settings → Pages**.
-2. **Source**: Deploy from a branch.
-3. **Branch**: `main`.
-4. **Folder**: `/docs`.
-5. Save.
+The Docker build:
+- builds the frontend in a dedicated stage
+- installs production backend dependencies in a separate stage
+- copies only runtime files into the final image
 
-Then visit:
-`https://<org-or-user>.github.io/site-crawler/`
+### Staging And Production
+
+For staging or production:
+- set `JOB_STATE_BACKEND=firestore`
+- point every instance at the same Firestore backend
+- set `TRUST_PROXY` intentionally for the real ingress path
+- regenerate `docs/config.js` for the target public app origin before publishing the docs
+
+Example docs config generation:
+
+```bash
+APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://crawler.example.com node scripts/write-public-config.mjs
+```
+
+### CI And Docs Publish Path
+
+The current CI workflow:
+- syntax-checks docs and release helpers
+- validates local, staging, and production docs/bookmarklet config generation
+- runs backend lint and tests
+- runs frontend lint and tests
+- builds the production Docker image
+- smoke-tests `/healthz`
+
+GitHub Pages content is served from `docs/`. The release docs tooling expects:
+- `docs/config.js`
+- `docs/install.js`
+- `docs/bookmarklet.js`
+- `docs/index.html`
+- `docs/landing.html`
+
+## Quick API Reference
+
+Primary UI-facing endpoints:
+- `POST /api/crawl/start`
+- `GET /api/crawl/:jobId`
+
+Health endpoints:
+- `GET /healthz`
+- `GET /readyz`
+
+There is also a direct crawl endpoint:
+- `POST /api/crawl`
+
+Use the background-job endpoints for the normal UI flow.
+
+## Docs And Public Pages
+
+- Public docs site: [https://carlashub.github.io/site-crawler/](https://carlashub.github.io/site-crawler/)
+- Public landing page source: [`docs/index.html`](docs/index.html)
+- Alternate docs page source: [`docs/landing.html`](docs/landing.html)
+- Bookmarklet loader source: [`docs/bookmarklet.js`](docs/bookmarklet.js)
+
+## License
+
+MIT

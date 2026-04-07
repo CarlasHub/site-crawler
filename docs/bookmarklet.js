@@ -1,5 +1,44 @@
 (() => {
-  const APP_ORIGIN = "https://site-crawler-989268314020.europe-west2.run.app";
+  function getCurrentScriptSource() {
+    const current = document.currentScript;
+    if (current && typeof current.src === "string" && current.src) return current.src;
+
+    const scripts = document.getElementsByTagName("script");
+    const lastScript = scripts[scripts.length - 1];
+    return lastScript && typeof lastScript.src === "string" ? lastScript.src : "";
+  }
+
+  function resolveAppOrigin() {
+    const scriptSource = getCurrentScriptSource();
+    if (!scriptSource) {
+      throw new Error("Cat Crawler could not determine its own script URL.");
+    }
+
+    const scriptUrl = new URL(scriptSource, window.location.href);
+    const paramValue = scriptUrl.searchParams.get("appOrigin");
+    const configuredOrigin = String(paramValue || "").trim();
+
+    if (!configuredOrigin) {
+      throw new Error("Cat Crawler bookmarklet is missing the appOrigin parameter.");
+    }
+
+    const parsed = new URL(configuredOrigin);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error(`Unsupported Cat Crawler app origin protocol: ${parsed.protocol}`);
+    }
+
+    return parsed.origin;
+  }
+
+  let APP_ORIGIN = "";
+  try {
+    APP_ORIGIN = resolveAppOrigin();
+  } catch (error) {
+    console.error(error);
+    window.alert("Cat Crawler is not configured with a valid app origin.");
+    return;
+  }
+
   const ROOT_ID = "cat-crawler-root";
   const PANEL_MIN_WIDTH = 320;
   const PANEL_MIN_HEIGHT = 280;

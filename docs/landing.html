@@ -3,329 +3,1067 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cat Crawler - Technical Overview</title>
+    <title>Cat Crawler · Documentation</title>
+    <meta
+      name="description"
+      content="Cat Crawler is a site crawler and validation tool for redirects, broken links, parameter handling, soft failures, URL patterns, and bookmarklet-assisted launches."
+    />
     <style>
+      @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+
       :root {
         color-scheme: dark;
-        --bg-base: #0b2b61;
-        --surface-primary: #0f3b7f;
-        --surface-secondary: #144a96;
-        --border: #1f5fb3;
-        --accent: #4cb6ff;
-        --text: #e6f0ff;
-        --muted: #b8d0ff;
-        --radius: 28px;
-        --radius-sm: 12px;
-        --max: 1100px;
+        --bg: #110f0f;
+        --bg-alt: #171414;
+        --surface: rgba(24, 20, 20, 0.94);
+        --surface-strong: rgba(31, 25, 25, 0.98);
+        --surface-soft: rgba(255, 255, 255, 0.04);
+        --border: rgba(255, 255, 255, 0.1);
+        --border-strong: rgba(255, 255, 255, 0.18);
+        --text: rgba(255, 255, 255, 0.96);
+        --text-mid: rgba(255, 255, 255, 0.76);
+        --text-muted: rgba(255, 255, 255, 0.58);
+        --accent: #00e5ff;
+        --accent-dim: rgba(0, 229, 255, 0.12);
+        --accent-glow: rgba(0, 229, 255, 0.28);
+        --accent-2: #a855f7;
+        --accent-2-dim: rgba(168, 85, 247, 0.12);
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+        --shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+        --max: 1180px;
         --font: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       }
 
       * { box-sizing: border-box; }
-      html, body { height: 100%; }
+      html { scroll-behavior: smooth; }
       body {
         margin: 0;
         font-family: var(--font);
-        background: var(--bg-base);
+        line-height: 1.6;
         color: var(--text);
-        line-height: 1.65;
-        font-size: 15px;
+        background:
+          radial-gradient(circle at top left, rgba(0, 229, 255, 0.12), transparent 28%),
+          radial-gradient(circle at top right, rgba(168, 85, 247, 0.14), transparent 32%),
+          linear-gradient(180deg, #110f0f 0%, #171414 100%);
       }
 
-      .wrap {
-        max-width: var(--max);
-        margin: 0 auto;
-        padding: 48px 24px 80px;
-      }
-
-      .hero {
-        background: var(--surface-primary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 32px;
-      }
-
-      .tag {
-        display: inline-flex;
-        gap: 8px;
-        align-items: center;
-        padding: 6px 12px;
-        border-radius: 999px;
-        background: var(--surface-secondary);
-        color: var(--text);
-        border: 1px solid var(--border);
-        font-size: 12px;
-        font-weight: 600;
-      }
-
-      h1 {
-        margin: 12px 0 10px;
-        font-size: 36px;
-        line-height: 1.2;
-      }
-
-      .sub {
-        color: var(--text);
-        max-width: 70ch;
-      }
-
-      .cta-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 18px;
-      }
-
-      .drag-note {
-        margin-top: 14px;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      .btn {
-        padding: 10px 16px;
-        border-radius: 10px;
-        border: 1px solid transparent;
-        font-weight: 700;
+      a {
+        color: var(--accent);
         text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
       }
 
-      .btn-primary {
-        background: var(--accent);
-        color: var(--bg-base);
-        border-color: var(--accent);
+      a:hover {
+        color: #ffffff;
       }
 
-      .btn-primary:hover {
-        background: var(--accent);
-      }
-
-      .btn-ghost {
-        border-color: var(--border);
-        color: var(--text);
-        background: transparent;
-      }
-
-      .section {
-        margin-top: 36px;
-      }
-
-      .grid-2 {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 16px;
-      }
-
-      .card {
-        background: var(--surface-primary);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-sm);
-        padding: 18px;
-      }
-
-      .card h3 {
-        margin: 0 0 6px;
-        font-size: 16px;
-      }
-
-      .card p { margin: 0; color: var(--muted); }
-
-      .step {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        gap: 12px;
-        padding: 14px;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        background: var(--surface-primary);
-      }
-
-      .step-num {
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
-        display: grid;
-        place-items: center;
-        font-weight: 700;
-        background: var(--accent);
-        color: var(--bg-base);
-      }
-
-      .step h4 { margin: 0 0 4px; font-size: 14px; }
-      .step p { margin: 0; color: var(--muted); }
-
-      .note {
-        margin-top: 14px;
-        padding: 12px 14px;
-        border-radius: 10px;
-        background: var(--surface-secondary);
-        border: 1px solid var(--border);
-        color: var(--text);
-      }
-
-      .list {
-        margin: 8px 0 0;
-        padding-left: 18px;
-        color: var(--muted);
-      }
-
-      .footer {
-        margin-top: 48px;
-        color: var(--muted);
-        font-size: 12px;
+      img,
+      video {
+        max-width: 100%;
+        display: block;
       }
 
       code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        background: var(--surface-secondary);
-        padding: 2px 6px;
-        border-radius: 6px;
-        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 0.94em;
+        padding: 0.1rem 0.42rem;
+        border-radius: 8px;
         border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .skip-link {
+        position: absolute;
+        left: -9999px;
+        top: 14px;
+        z-index: 100;
+        padding: 0.8rem 1rem;
+        border-radius: var(--radius-sm);
+        background: #ffffff;
+        color: #000000;
+        font-weight: 700;
+      }
+
+      .skip-link:focus {
+        left: 14px;
+      }
+
+      .shell {
+        max-width: var(--max);
+        margin: 0 auto;
+        padding: 24px 20px 96px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        backdrop-filter: blur(18px);
+        background: rgba(17, 15, 15, 0.82);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        margin: 0 auto 24px;
+        padding: 12px 18px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: center;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background:
+          radial-gradient(circle at 30% 30%, rgba(0, 229, 255, 0.35), transparent 55%),
+          linear-gradient(140deg, rgba(0, 229, 255, 0.18), rgba(168, 85, 247, 0.2)),
+          #191515;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 0 36px rgba(0, 229, 255, 0.16);
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 0.98rem;
+      }
+
+      .brand span {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .nav a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        padding: 0 14px;
+        border-radius: 999px;
+        color: var(--text-mid);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid transparent;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .nav a:hover,
+      .nav a:focus-visible {
+        color: var(--text);
+        border-color: var(--border);
+      }
+
+      .hero {
+        padding: 40px;
+        border-radius: var(--radius-xl);
+        border: 1px solid var(--border);
+        background:
+          linear-gradient(145deg, rgba(0, 229, 255, 0.07), transparent 24%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.02)),
+          var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow,
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0.45rem 0.8rem;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .hero h1 {
+        margin: 18px 0 14px;
+        font-size: clamp(2.2rem, 5vw, 4.3rem);
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        max-width: 11ch;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 72ch;
+        color: var(--text-mid);
+        font-size: 1.02rem;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.85fr);
+        gap: 28px;
+        align-items: end;
+      }
+
+      .hero-actions,
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .button,
+      button.button {
+        appearance: none;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        min-height: 48px;
+        padding: 0 18px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      .button-primary {
+        background: linear-gradient(135deg, var(--accent), #69f0ff);
+        color: #031018;
+        box-shadow: 0 0 40px rgba(0, 229, 255, 0.2);
+      }
+
+      .button-secondary {
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        border-color: var(--border);
+      }
+
+      .button-primary:hover,
+      .button-secondary:hover,
+      .button-primary:focus-visible,
+      .button-secondary:focus-visible {
+        filter: brightness(1.04);
+      }
+
+      .hero-meta {
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero-card,
+      .section-card,
+      .mini-card {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface-strong);
+      }
+
+      .hero-card {
+        padding: 18px;
+      }
+
+      .hero-card h2,
+      .section-card h2,
+      .mini-card h3 {
+        margin: 0 0 10px;
+        line-height: 1.2;
+      }
+
+      .hero-card p,
+      .section-card p,
+      .mini-card p,
+      .section-card li,
+      .mini-card li {
+        margin: 0;
+        color: var(--text-mid);
+      }
+
+      .hero-card ul,
+      .section-card ul {
+        margin: 12px 0 0;
+        padding-left: 18px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 18px;
+        margin-top: 24px;
+      }
+
+      .three-up,
+      .two-up {
+        display: grid;
+        gap: 18px;
+      }
+
+      .three-up {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .two-up {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .mini-card {
+        padding: 18px;
+      }
+
+      .section-card {
+        padding: 26px;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .section-heading p {
+        max-width: 70ch;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .step {
+        padding: 18px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .step-number {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        display: inline-grid;
+        place-items: center;
+        margin-bottom: 12px;
+        background: var(--accent-dim);
+        color: var(--accent);
+        border: 1px solid rgba(0, 229, 255, 0.25);
+        font-weight: 800;
+      }
+
+      .feature {
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(260px, 0.95fr);
+        gap: 24px;
+        align-items: start;
+      }
+
+      .feature-copy {
+        display: grid;
+        gap: 14px;
+      }
+
+      .feature-copy ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text-mid);
+      }
+
+      .feature-copy li + li {
+        margin-top: 8px;
+      }
+
+      .value {
+        padding: 14px 16px;
+        border-left: 3px solid var(--accent);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        background: rgba(0, 229, 255, 0.07);
+        color: var(--text);
+      }
+
+      .placeholder {
+        min-height: 280px;
+        padding: 22px;
+        border-radius: var(--radius-lg);
+        border: 1px dashed rgba(0, 229, 255, 0.35);
+        background:
+          linear-gradient(145deg, rgba(0, 229, 255, 0.08), rgba(168, 85, 247, 0.08)),
+          rgba(255, 255, 255, 0.02);
+        display: grid;
+        align-content: center;
+        gap: 8px;
+      }
+
+      .placeholder strong {
+        font-size: 1rem;
+      }
+
+      .placeholder span {
+        color: var(--accent);
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .placeholder p {
+        color: var(--text-mid);
+        margin: 0;
+      }
+
+      .details-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .callout {
+        padding: 16px 18px;
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(168, 85, 247, 0.28);
+        background: var(--accent-2-dim);
+        color: var(--text);
+      }
+
+      .callout strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .install-panel {
+        display: grid;
+        gap: 16px;
+      }
+
+      .snippet {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .fine-print,
+      .footer {
+        color: var(--text-muted);
+        font-size: 0.92rem;
+      }
+
+      .footer {
+        margin-top: 28px;
+        padding: 24px 0 12px;
+      }
+
+      @media (max-width: 980px) {
+        .hero-grid,
+        .feature,
+        .three-up,
+        .two-up,
+        .steps,
+        .details-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          padding: 28px;
+        }
+
+        .section-heading {
+          align-items: start;
+          flex-direction: column;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .shell {
+          padding-inline: 14px;
+        }
+
+        .topbar {
+          border-radius: var(--radius-md);
+        }
+
+        .hero {
+          padding: 22px;
+        }
       }
     </style>
   </head>
   <body>
-    <main class="wrap">
-      <section class="hero">
-        <span class="tag">Cat Crawler · Technical overview · Drag-to-install bookmarklet</span>
-        <h1>Website validation crawler with an in-page bookmarklet runner.</h1>
-        <p class="sub">
-          Cat Crawler crawls internal navigation, follows redirects, tests parameter variants, detects soft failures, and groups URL-pattern inconsistencies.
-          Drag the bookmarklet to your bookmarks bar to open the crawler against the page you are currently viewing.
-        </p>
-        <div class="cta-row">
-          <a
-            class="btn btn-primary"
-            id="bookmarkletLink"
-            href="#bookmarklet"
-            draggable="true"
-            title="Drag to bookmarks bar"
-            aria-label="Cat Crawler bookmarklet. Drag to bookmarks bar."
-          >
-            Drag Cat Crawler 😼
-          </a>
-          <a class="btn btn-ghost" href="#bookmarklet">Bookmarklet setup</a>
-        </div>
-        <div class="drag-note">Tip: if your bookmarks bar is hidden, press <code>Cmd</code> + <code>Shift</code> + <code>B</code> in Chrome.</div>
-      </section>
+    <a class="skip-link" href="#main">Skip to content</a>
 
-      <section class="section grid-2">
-        <div class="card">
-          <h3>Discovery model</h3>
-          <p>Starts from sitemap.xml when available, then traverses internal <code>a[href]</code> links and <code>form[action]</code> routes while respecting robots.txt.</p>
-        </div>
-        <div class="card">
-          <h3>Validation checks</h3>
-          <p>Classifies navigation into broken URLs, redirect issues, parameter-handling issues, soft failures, and prioritised impact levels.</p>
-        </div>
-        <div class="card">
-          <h3>Runtime controls</h3>
-          <p>Supports host scoping, path exclusions, language-agnostic path limits, job-page suppression, concurrency control, and optional parameter audit.</p>
-        </div>
-        <div class="card">
-          <h3>Output model</h3>
-          <p>Returns referrer-aware audit entries plus dedicated sections for redirect chains, soft failures, URL patterns, impact analysis, and TXT/CSV export.</p>
-        </div>
-      </section>
-
-      <section id="how" class="section">
-        <h2>Run model</h2>
-        <div class="grid-2">
-          <div class="step">
-            <div class="step-num">1</div>
-            <div>
-              <h4>Seed the crawl</h4>
-              <p>Enter the homepage or scoped start path, for example <code>https://example.com</code> or <code>https://example.com/en</code>.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">2</div>
-            <div>
-              <h4>Define crawl rules</h4>
-              <p>Add excluded paths and path limits such as <code>/jobs</code>, <code>/careers</code>, or <code>/job</code> max 5.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">3</div>
-            <div>
-              <h4>Choose validators</h4>
-              <p>Enable HTTP status checks and parameter audit when the target site uses query-driven routing or filtered search pages.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">4</div>
-            <div>
-              <h4>Execute the run</h4>
-              <p>The crawler tests each discovered navigation entry, records referrers, follows redirects fully, and classifies the result.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-num">5</div>
-            <div>
-              <h4>Review the report</h4>
-              <p>Use the validation report, redirect audit, soft-failure audit, pattern audit, and impact analysis before exporting TXT or CSV.</p>
-            </div>
+    <main id="main" class="shell">
+      <div class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <strong>Cat Crawler</strong>
+            <span>Site crawler, validation report, and bookmarklet launcher</span>
           </div>
         </div>
-        <div class="note">
-          Recommendation: turn on <code>Broken link quick check</code> for production audits and <code>Parameter audit</code> for search/results routes.
-        </div>
-      </section>
 
-      <section id="bookmarklet" class="section grid-2">
-        <div class="card">
-          <h3>Bookmarklet setup (Cat Crawler)</h3>
-          <p>The bookmarklet injects a floating iframe pointed at the deployed app and passes the current page URL as the seed.</p>
-          <ol class="list">
-            <li>Drag the <code>Drag Cat Crawler 😼</code> button above to your bookmarks bar.</li>
-            <li>Open any page you want to inspect.</li>
-            <li>Click the saved bookmark to load the latest <code>bookmarklet.js</code> from GitHub Pages.</li>
-            <li>Drag the header to move the panel and resize it from any of the four corners.</li>
-          </ol>
-        </div>
-        <div class="card">
-          <h3>Audit scope checklist</h3>
-          <p>Use this before exporting or sharing results:</p>
-          <ul class="list">
-            <li>Confirm sitemap and robots.txt were reachable</li>
-            <li>Check whether excluded sections and path limits hid expected routes</li>
-            <li>Review redirect chains for loops, multiple hops, and dropped parameters</li>
-            <li>Review soft failures on 200 responses before treating them as valid</li>
-            <li>Use impact analysis to prioritise repeated or core-flow issues</li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="section grid-2">
-        <div class="card">
-          <h3>Response sections</h3>
-          <p><code>issueReport</code>, <code>audit</code>, <code>redirectAudit</code>, <code>softFailureAudit</code>, <code>patternAudit</code>, <code>parameterAudit</code>, and <code>impactAudit</code>.</p>
-        </div>
-        <div class="card">
-          <h3>Bookmarklet update model</h3>
-          <p>The installed bookmark loads the current script from GitHub Pages, so bookmarklet behavior can be updated without replacing the saved bookmark again.</p>
-        </div>
-      </section>
-
-      <div class="footer">
-        Cat Crawler · Carla Goncalves · 2026
+        <nav class="nav" aria-label="Page">
+          <a href="#what">What it is</a>
+          <a href="#how">How it works</a>
+          <a href="#features">Features</a>
+          <a href="#bookmarklet">Bookmarklet</a>
+          <a href="#technical">Technical notes</a>
+          <a href="#setup">Setup</a>
+        </nav>
       </div>
+
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <span class="eyebrow">Cat Crawler · Public docs · Bookmarklet installer</span>
+            <h1>Crawl a site and review the results in one report.</h1>
+            <p>
+              Cat Crawler starts from a homepage or scoped path, follows internal routes, and groups the findings into
+              clear sections for redirects, parameter handling, soft failures, URL patterns, and issue impact.
+            </p>
+            <div class="hero-actions">
+              <a
+                class="button button-primary"
+                id="bookmarkletLink"
+                href="#bookmarklet"
+                draggable="true"
+                title="Drag to your bookmarks bar"
+                aria-label="Drag Cat Crawler bookmarklet to your bookmarks bar"
+              >
+                Drag Cat Crawler 😼
+              </a>
+              <a class="button button-secondary" href="https://github.com/CarlasHub/site-crawler">View repository</a>
+              <a class="button button-secondary" href="https://github.com/CarlasHub/site-crawler/blob/main/README.md">Read README</a>
+            </div>
+            <p class="fine-print">
+              The bookmarklet opens the Cat Crawler app in a floating panel and passes the current page URL into the app.
+              It does not replace the backend crawler.
+            </p>
+          </div>
+
+          <div class="hero-meta">
+            <div class="hero-card">
+              <h2>What it is</h2>
+              <p>
+                A React frontend plus Node backend for crawl and navigation validation, with an optional bookmarklet
+                installer for launching the app from the page you are already on.
+              </p>
+            </div>
+            <div class="hero-card">
+              <h2>What it is good for</h2>
+              <ul>
+                <li>Internal site QA and regression checks</li>
+                <li>Redirect and routing review after content or platform changes</li>
+                <li>Parameter handling checks for search and filtered results pages</li>
+                <li>Quick launch from the current page with the bookmarklet</li>
+              </ul>
+            </div>
+            <div class="hero-card">
+              <h2>Current limits</h2>
+              <ul>
+                <li>Same-host crawling only</li>
+                <li>Backend hard caps: up to 300 pages and concurrency 6</li>
+                <li>Staging and production require Firestore-backed job state</li>
+                <li>GitHub Pages only hosts docs and the bookmarklet loader, not the crawler backend</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="what" class="stack">
+        <div class="three-up">
+          <article class="mini-card">
+            <h3>What the tool does</h3>
+            <p>
+              It crawls internal navigation from a starting URL, records referrers, respects <code>robots.txt</code>,
+              follows redirects, and groups results into reviewable report sections.
+            </p>
+          </article>
+          <article class="mini-card">
+            <h3>Who it is for</h3>
+            <p>
+              Developers, QA teams, SEO reviewers, and site owners who need a structured crawl report instead of a
+              manual click-through.
+            </p>
+          </article>
+          <article class="mini-card">
+            <h3>What it does not claim</h3>
+            <p>
+              It does not replace human judgement, and the GitHub Pages site does not provide a hosted crawler service
+              by itself.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="how" class="section-card stack">
+        <div class="section-heading">
+          <div>
+            <span class="chip">How it works</span>
+            <h2>Use it in four simple steps</h2>
+            <p>
+              The UI is built around a crawl job, progress polling, and grouped report sections. The bookmarklet just
+              helps you start from the page you already have open.
+            </p>
+          </div>
+        </div>
+
+        <div class="steps">
+          <article class="step">
+            <div class="step-number">1</div>
+            <h3>Choose a starting URL</h3>
+            <p>Use a homepage or a scoped path such as <code>/en</code> if you only want one section of a site.</p>
+          </article>
+          <article class="step">
+            <div class="step-number">2</div>
+            <h3>Set crawl rules</h3>
+            <p>Add exclude paths, path limits, max pages, concurrency, and optional checks such as parameter audit.</p>
+          </article>
+          <article class="step">
+            <div class="step-number">3</div>
+            <h3>Run the crawl</h3>
+            <p>The backend creates a background job, crawls internal routes, and reports progress back to the UI.</p>
+          </article>
+          <article class="step">
+            <div class="step-number">4</div>
+            <h3>Review and export</h3>
+            <p>Use the grouped report sections, then export TXT or CSV when you need to share the result.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="features" class="stack">
+        <article class="section-card">
+          <div class="feature">
+            <div class="feature-copy">
+              <div>
+                <span class="chip">Feature</span>
+                <h2>Main dashboard and progress</h2>
+              </div>
+              <p>
+                The app shows a single runner view for crawl setup, progress, and the latest crawl state so you can see
+                whether the job is queued, running, complete, or failed.
+              </p>
+              <div class="value">
+                <strong>User value</strong>
+                You can start a crawl and understand its current state without switching between separate tools or screens.
+              </div>
+              <ul>
+                <li>Shows progress percent, phase, and crawl counts</li>
+                <li>Keeps the latest crawl visible after completion</li>
+                <li>Surfaces failures in the same UI instead of sending you to a separate console</li>
+              </ul>
+            </div>
+            <!-- Screenshot placeholder: main dashboard -->
+            <div class="placeholder" aria-label="Screenshot placeholder: main dashboard">
+              <span>Screenshot placeholder</span>
+              <strong>Main dashboard</strong>
+              <p>Drop a screenshot of the main dashboard, progress area, and runner shell here.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="section-card">
+          <div class="feature">
+            <div class="feature-copy">
+              <div>
+                <span class="chip">Feature</span>
+                <h2>Crawl runner and scope controls</h2>
+              </div>
+              <p>
+                The main runner lets you seed a crawl, exclude sections, cap noisy paths, and choose whether to enable
+                broken-link checking or parameter audit.
+              </p>
+              <div class="value">
+                <strong>User value</strong>
+                You can narrow the crawl to the parts of a site that matter without changing backend code or editing a config file.
+              </div>
+              <ul>
+                <li>Exclude paths are entered as simple line-by-line rules</li>
+                <li>Path limits are language-agnostic, so <code>/job</code> can also match <code>/en/job</code></li>
+                <li>The UI clamps max pages and concurrency to the backend caps</li>
+              </ul>
+            </div>
+            <!-- Screenshot placeholder: crawl settings -->
+            <div class="placeholder" aria-label="Screenshot placeholder: crawl settings">
+              <span>Screenshot placeholder</span>
+              <strong>Crawl settings</strong>
+              <p>Drop a screenshot of the runner form, exclusions, and path-limit controls here.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="section-card">
+          <div class="feature">
+            <div class="feature-copy">
+              <div>
+                <span class="chip">Feature</span>
+                <h2>Main validation report</h2>
+              </div>
+              <p>
+                The validation report collects the main issue groups into one place so you can review broken URLs,
+                redirect issues, parameter issues, soft failures, and prioritised impact without switching screens.
+              </p>
+              <div class="value">
+                <strong>User value</strong>
+                You get one report entry point instead of having to inspect raw crawl output line by line.
+              </div>
+              <ul>
+                <li>Broken URLs are separated from redirect and soft-failure issues</li>
+                <li>Referrers and final URLs are kept visible for triage</li>
+                <li>Impact analysis helps sort repeated or higher-value issues first</li>
+              </ul>
+            </div>
+            <!-- Screenshot placeholder: validation report -->
+            <div class="placeholder" aria-label="Screenshot placeholder: validation report">
+              <span>Screenshot placeholder</span>
+              <strong>Validation report</strong>
+              <p>Drop a screenshot of the main grouped validation report here.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="section-card">
+          <div class="feature">
+            <div class="feature-copy">
+              <div>
+                <span class="chip">Feature</span>
+                <h2>Redirect audit</h2>
+              </div>
+              <p>
+                Redirected routes are expanded into a dedicated audit with step-by-step chain details and flags for loops,
+                multi-hop redirects, dropped parameters, and irrelevant destinations.
+              </p>
+              <div class="value">
+                <strong>User value</strong>
+                Redirect problems are isolated from the rest of the crawl so they are easier to diagnose and hand off.
+              </div>
+              <ul>
+                <li>Shows redirect status codes and final destination</li>
+                <li>Flags loops and long redirect chains</li>
+                <li>Shows when a redirect drops query parameters</li>
+              </ul>
+            </div>
+            <!-- Screenshot placeholder: redirect audit -->
+            <div class="placeholder" aria-label="Screenshot placeholder: redirect audit">
+              <span>Screenshot placeholder</span>
+              <strong>Redirect audit</strong>
+              <p>Drop a screenshot of redirect issues and redirect chains here.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="section-card">
+          <div class="feature">
+            <div class="feature-copy">
+              <div>
+                <span class="chip">Feature</span>
+                <h2>Parameter audit</h2>
+              </div>
+              <p>
+                Parameter audit sends a small set of querystring variations to the site and records whether parameters are
+                preserved, dropped, or redirected in unexpected ways.
+              </p>
+              <div class="value">
+                <strong>User value</strong>
+                It helps catch fragile routing or filtering behaviour that a normal crawl would not reveal.
+              </div>
+              <ul>
+                <li>Useful for search pages, filter pages, and paginated listings</li>
+                <li>Separates HTTP errors from parameter-preservation problems</li>
+                <li>Shows base URL, tested variant, and final URL together</li>
+              </ul>
+            </div>
+            <!-- Screenshot placeholder: parameter audit -->
+            <div class="placeholder" aria-label="Screenshot placeholder: parameter audit">
+              <span>Screenshot placeholder</span>
+              <strong>Parameter audit</strong>
+              <p>Drop a screenshot of parameter-handling issues here.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="section-card">
+          <div class="feature">
+            <div class="feature-copy">
+              <div>
+                <span class="chip">Feature</span>
+                <h2>Soft failures, URL patterns, and duplicate candidates</h2>
+              </div>
+              <p>
+                Cat Crawler also highlights pages that look broken despite returning success, structural URL anomalies,
+                and possible duplicate content groups.
+              </p>
+              <div class="value">
+                <strong>User value</strong>
+                You can review issues that are easy to miss when you only look at status codes.
+              </div>
+              <ul>
+                <li>Soft failures can include missing content, error text, or failed API calls</li>
+                <li>Pattern audit helps spot inconsistent naming or legacy/current path pairs</li>
+                <li>Duplicate candidates group query variants and language variants</li>
+              </ul>
+            </div>
+            <!-- Screenshot placeholder: soft failure and pattern review -->
+            <div class="placeholder" aria-label="Screenshot placeholder: soft failure and pattern review">
+              <span>Screenshot placeholder</span>
+              <strong>Soft failures and URL patterns</strong>
+              <p>Drop a screenshot of soft-failure audit, pattern audit, or duplicate candidates here.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="section-card">
+          <div class="feature">
+            <div class="feature-copy">
+              <div>
+                <span class="chip">Feature</span>
+                <h2>Presets, progress, and exports</h2>
+              </div>
+              <p>
+                Presets let you save common crawl settings in the browser, while the progress area shows crawl status and
+                the final results can be exported as TXT or CSV.
+              </p>
+              <div class="value">
+                <strong>User value</strong>
+                Repeating the same audit for the same client or section takes less manual setup.
+              </div>
+              <ul>
+                <li>Save, load, delete, export, and import presets in the browser</li>
+                <li>Progress view reports pages crawled, discovered, and parameter-check totals</li>
+                <li>TXT and CSV export use the filtered audit report</li>
+              </ul>
+            </div>
+            <!-- Screenshot placeholder: presets and exports -->
+            <div class="placeholder" aria-label="Screenshot placeholder: presets and exports">
+              <span>Screenshot placeholder</span>
+              <strong>Presets and exports</strong>
+              <p>Drop a screenshot of presets, progress, or export actions here.</p>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="bookmarklet" class="section-card stack">
+        <div class="section-heading">
+          <div>
+            <span class="chip">Bookmarklet</span>
+            <h2>Launch Cat Crawler from the page you are already viewing</h2>
+            <p>
+              The bookmarklet loads the current <code>docs/bookmarklet.js</code> from GitHub Pages, reads the configured
+              app origin, and opens the deployed app in an iframe with the current page URL prefilled.
+            </p>
+          </div>
+        </div>
+
+        <div class="two-up">
+          <div class="mini-card">
+            <h3>What it does</h3>
+            <ul>
+              <li>Injects a floating button and panel into the current page</li>
+              <li>Loads the Cat Crawler app from <span data-app-origin>configured app origin</span></li>
+              <li>Passes the current page URL into the app as the crawl seed</li>
+              <li>Lets you drag the panel and resize it from four corners</li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3>What it depends on</h3>
+            <ul>
+              <li>The public docs config must contain the correct <code>appOrigin</code></li>
+              <li>The target app must actually be deployed at that origin</li>
+              <li>The bookmarklet is an app launcher, not a self-contained crawler runtime</li>
+              <li>For a new environment, regenerate <code>docs/config.js</code> before publishing</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Screenshot placeholder: bookmarklet panel -->
+        <div class="placeholder" aria-label="Screenshot placeholder: bookmarklet panel">
+          <span>Screenshot placeholder</span>
+          <strong>Bookmarklet panel</strong>
+          <p>Drop a screenshot of the floating bookmarklet panel on a live page here.</p>
+        </div>
+
+        <div class="install-panel">
+          <div class="callout">
+            <strong>Bookmarklet install note</strong>
+            The docs config currently resolves to the <span data-docs-environment>current</span> environment and app origin
+            <code data-app-origin>http://localhost:8080</code>. For a staging or production release, regenerate the config before publishing the docs.
+          </div>
+
+          <div class="button-row">
+            <button class="button button-primary" id="copyBookmarklet" type="button">Copy bookmarklet URL</button>
+            <a class="button button-secondary" href="https://github.com/CarlasHub/site-crawler/blob/main/README.md#deployment-notes">Deployment notes</a>
+          </div>
+
+          <pre id="bookmarkletSnippet" class="snippet">Bookmarklet link will be generated from docs/config.js and docs/install.js.</pre>
+        </div>
+      </section>
+
+      <section id="technical" class="section-card stack">
+        <div class="section-heading">
+          <div>
+            <span class="chip">Technical notes</span>
+            <h2>Current run model, deployment model, and limits</h2>
+            <p>
+              This section keeps the operational facts close to the public docs without trying to replace the README.
+            </p>
+          </div>
+        </div>
+
+        <div class="details-grid">
+          <div class="mini-card">
+            <h3>Architecture</h3>
+            <ul>
+              <li>React frontend served as a built Vite app</li>
+              <li>Express backend for crawl jobs and result APIs</li>
+              <li>GitHub Pages hosts docs and the bookmarklet loader</li>
+              <li>Bookmarklet mode opens the main app in an iframe</li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3>Current backend constraints</h3>
+            <ul>
+              <li>Background-job API is the normal UI path</li>
+              <li>Default and maximum pages: <code>300</code></li>
+              <li>Default and maximum concurrency: <code>6</code></li>
+              <li>Per-IP rate limits are enforced by the backend</li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3>Production deployment notes</h3>
+            <ul>
+              <li>Local development defaults to file-backed job state</li>
+              <li>Staging and production must use <code>JOB_STATE_BACKEND=firestore</code></li>
+              <li>All production instances must share the same Firestore backend</li>
+              <li>Docker is the supported production build path in CI</li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3>What to treat carefully</h3>
+            <ul>
+              <li>Soft-failure and pattern sections are review aids, not absolute truth</li>
+              <li>GitHub Pages alone does not host the crawler app</li>
+              <li>The bookmarklet must point at a real deployed app origin</li>
+              <li>Same-host crawling is intentional and enforced</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="setup" class="section-card stack">
+        <div class="section-heading">
+          <div>
+            <span class="chip">Setup and deployment</span>
+            <h2>Start locally, then configure the docs for the environment you are publishing</h2>
+          </div>
+        </div>
+
+        <div class="two-up">
+          <div class="mini-card">
+            <h3>Local setup</h3>
+            <ul>
+              <li>Run <code>npm ci</code> in <code>frontend/</code> and <code>backend/</code></li>
+              <li>Build the frontend with <code>npm run build</code> in <code>frontend/</code></li>
+              <li>Start the backend with <code>npm start</code> in <code>backend/</code></li>
+              <li>Local bookmarklet config defaults to <code>http://localhost:8080</code></li>
+            </ul>
+          </div>
+          <div class="mini-card">
+            <h3>Docs publish path</h3>
+            <ul>
+              <li>Use <code>APP_ENV</code> and <code>BOOKMARKLET_APP_ORIGIN</code> with <code>scripts/write-public-config.mjs</code></li>
+              <li>Validate the docs installer with <code>scripts/validate-public-docs.mjs</code></li>
+              <li>Keep <code>docs/index.html</code> and <code>docs/landing.html</code> aligned</li>
+              <li>Read the README for full deployment and Docker details</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <a class="button button-secondary" href="https://github.com/CarlasHub/site-crawler/blob/main/README.md">Open README on GitHub</a>
+          <a class="button button-secondary" href="https://github.com/CarlasHub/site-crawler">Open repository</a>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <p>Cat Crawler documentation and bookmarklet installer.</p>
+        <p>Copyright <span id="year"></span> Carla Goncalves.</p>
+      </footer>
     </main>
+
+    <script src="./config.js"></script>
+    <script src="./install.js"></script>
     <script>
       (function () {
-        var bookmarklet =
-          '(function(){' +
-          'var script=document.createElement(\"script\");' +
-          'script.src=\"https://carlashub.github.io/site-crawler/bookmarklet.js?t=\"+Date.now();' +
-          'document.body.appendChild(script);' +
-          '})();';
+        var year = document.getElementById("year");
+        if (year) {
+          year.textContent = String(new Date().getFullYear());
+        }
 
-        var link = document.getElementById('bookmarkletLink');
-        if (link) {
-          link.setAttribute('href', 'javascript:' + bookmarklet);
+        var config = window.CAT_CRAWLER_PUBLIC_CONFIG || {};
+        var link = document.getElementById("bookmarkletLink");
+        var snippet = document.getElementById("bookmarkletSnippet");
+        var copyButton = document.getElementById("copyBookmarklet");
+        var originNodes = document.querySelectorAll("[data-app-origin]");
+        var environmentNodes = document.querySelectorAll("[data-docs-environment]");
+
+        originNodes.forEach(function (node) {
+          node.textContent = config.appOrigin || "not configured";
+        });
+
+        environmentNodes.forEach(function (node) {
+          node.textContent = config.environment || "unknown";
+        });
+
+        function syncSnippet() {
+          if (!snippet || !link) return;
+          var href = link.getAttribute("href") || "";
+          snippet.textContent = /^javascript:/.test(href)
+            ? href
+            : "Bookmarklet link is not available. Check docs/config.js and docs/install.js.";
+        }
+
+        syncSnippet();
+
+        if (copyButton) {
+          copyButton.addEventListener("click", async function () {
+            var text = snippet ? snippet.textContent || "" : "";
+            if (!text) return;
+
+            try {
+              await navigator.clipboard.writeText(text);
+              copyButton.textContent = "Copied";
+              window.setTimeout(function () {
+                copyButton.textContent = "Copy bookmarklet URL";
+              }, 1600);
+            } catch (error) {
+              window.alert("Copy failed. Copy the bookmarklet URL from the code block instead.");
+            }
+          });
         }
       })();
     </script>
