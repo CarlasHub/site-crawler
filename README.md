@@ -63,7 +63,7 @@ Its behaviour is:
 - **reuse one instance**: running the bookmarklet again focuses the same root; if you navigate and run it again, the iframe reloads with the new page URL
 - **Close** tears the UI down completely
 
-The public docs site builds the install link from [`docs/config.js`](docs/config.js) and [`docs/install.js`](docs/install.js). The **committed** `docs/config.js` targets production (`https://carla-site-crawler.fly.dev` by default—change it to your real deploy). For local testing only, run `APP_ENV=local node scripts/write-public-config.mjs` (never commit that output). `scripts/validate-committed-docs-config.mjs` rejects loopback or non-HTTPS origins in the tracked file.
+The public docs site builds the install link from [`docs/config.js`](docs/config.js) and [`docs/install.js`](docs/install.js). The **committed** `docs/config.js` sets `appOrigin` to your production app (currently **Google Cloud Run**: `https://site-crawler-909296093050.europe-west2.run.app`). For local testing only, run `APP_ENV=local node scripts/write-public-config.mjs` (never commit that output). `scripts/validate-committed-docs-config.mjs` rejects loopback or non-HTTPS origins in the tracked file.
 
 ## Current Architecture And Run Model
 
@@ -225,12 +225,18 @@ For staging or production:
 Example docs config generation:
 
 ```bash
-APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://carla-site-crawler.fly.dev node scripts/write-public-config.mjs
+APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://site-crawler-909296093050.europe-west2.run.app node scripts/write-public-config.mjs
 ```
 
-### Fly.io
+### Google Cloud Run (production app)
 
-[`fly.toml`](fly.toml) defines app name `carla-site-crawler` (URL `https://carla-site-crawler.fly.dev` when that name is available). Deploy with the Fly CLI: `fly launch` once, then `fly deploy`. Set production secrets (for example `JOB_STATE_BACKEND=firestore`) per your environment.
+The live UI + API for Cat Crawler is deployed separately from GitHub Pages—for example on **[Cloud Run](https://cloud.google.com/run)**. The bookmarklet’s `appOrigin` must match that HTTPS origin (no trailing slash), e.g. `https://site-crawler-909296093050.europe-west2.run.app`.
+
+GitHub Pages only serves the static docs and bookmarklet loader; crawls still run against your Cloud Run service.
+
+### Fly.io (optional)
+
+[`fly.toml`](fly.toml) is only relevant if you choose to deploy with [Fly.io](https://fly.io/) instead of (or in addition to) Cloud Run. Ignore it if you use Cloud Run only.
 
 ### Doc screenshots (Playwright)
 
