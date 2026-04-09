@@ -559,7 +559,14 @@ export default function App() {
       <header className="header">
         <div className="headerInner">
           <div className="brand">
-            <div className="brandMark" aria-hidden="true" />
+            <img
+              className="brandMark"
+              src="/cat.png"
+              alt=""
+              width={50}
+              height={50}
+              decoding="async"
+            />
             <div className="brandText">
               <div className="brandName">{brandName}</div>
               <div className="brandTag">{brandTag}</div>

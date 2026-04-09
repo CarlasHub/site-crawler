@@ -160,7 +160,9 @@
         height: 40px;
         border-radius: 11px;
         border: 1px solid var(--line-strong);
-        background: linear-gradient(145deg, var(--accent-dim), rgba(255, 255, 255, 0.03));
+        object-fit: cover;
+        display: block;
+        flex-shrink: 0;
       }
 
       .brand__name {
@@ -394,6 +396,21 @@
       .hero__actions--tight {
         margin-top: 0.5rem;
         margin-bottom: 0;
+      }
+
+      .hero__bookmarklet-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+      }
+
+      .hero__bookmarklet-hint {
+        margin: 0;
+        font-size: 0.78rem;
+        line-height: 1.4;
+        color: var(--text-quiet);
+        max-width: 16rem;
       }
 
       .hero__note {
@@ -1189,7 +1206,14 @@
     <header class="topbar">
       <div class="topbar__inner">
         <div class="brand">
-          <div class="brand__mark" aria-hidden="true"></div>
+          <img
+            class="brand__mark"
+            src="./cat.png"
+            alt=""
+            width="40"
+            height="40"
+            decoding="async"
+          />
           <div>
             <span class="brand__name">Cat Crawler</span>
             <span class="brand__tag">Crawl, validate, export</span>
@@ -1223,15 +1247,18 @@
               <li>TXT &amp; CSV export</li>
             </ul>
             <div class="hero__actions">
-              <a
-                class="btn btn--primary"
-                id="bookmarkletLink"
-                href="#bookmarklet"
-                draggable="true"
-                title="Drag this button to your bookmarks bar to install"
-                aria-label="Install Cat Crawler: drag this button to your bookmarks bar, or activate to jump to copy the bookmarklet link"
-                >Drag to bookmarks bar</a
-              >
+              <div class="hero__bookmarklet-wrap">
+                <a
+                  class="btn btn--primary"
+                  id="bookmarkletLink"
+                  href="#bookmarklet"
+                  draggable="true"
+                  title="Drag to your bookmarks bar to install"
+                  aria-label="Cat Crawler bookmarklet: drag to bookmarks bar to save as 🐱 Cat Crawler, or activate to jump to copy the bookmarklet link"
+                  >🐱 Cat Crawler</a
+                >
+                <p class="hero__bookmarklet-hint">Drag the button above to your bookmarks bar.</p>
+              </div>
               <a class="btn btn--secondary" href="#features">Explore the product</a>
               <a class="btn btn--ghost" href="https://github.com/CarlasHub/site-crawler/blob/main/README.md">README on GitHub</a>
             </div>
@@ -1853,6 +1880,7 @@
                   <li>Public <code>http(s)</code> targets only; internal, loopback, link-local, and metadata destinations are blocked.</li>
                   <li>UI and backend caps are <code>300</code> pages and <code>6</code> concurrency.</li>
                   <li>Crawl jobs are rate-limited; caps and safety rules are enforced server-side.</li>
+                  <li>Active crawl jobs are hard-capped to <code>2</code> (<code>CRAWL_MAX_ACTIVE_JOBS</code>).</li>
                   <li>Soft-failure, pattern, impact, and duplicate-candidate views are review aids—heuristic or grouped—not absolute verdicts.</li>
                 </ul>
               </article>
@@ -1862,6 +1890,7 @@
                   <li>Local development defaults to file-backed job state.</li>
                   <li>Staging and production must use <code>JOB_STATE_BACKEND=firestore</code>.</li>
                   <li>Production instances must share the same Firestore backend and collection prefix.</li>
+                  <li>Repo Fly config caps running machines at <code>2</code> when Fly.io is used.</li>
                   <li>The bookmarklet must point at a real deployed app origin.</li>
                 </ul>
               </article>

@@ -152,34 +152,15 @@
    }
    
    .brandMark {
-     /* width: 44px;
-     height: 44px;
-     border-radius: 12px;
-     background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-     border: none;
-     box-shadow: 
-       var(--shadow-sm),
-       0 0 24px -4px var(--accent-glow);
-     display: grid;
-     place-items: center;
-     position: relative;
-     overflow: hidden; */
-
      width: 50px;
      height: 50px;
-     background-image: url("/cat.png");
-     background-size: cover;
-   }
-   
-   .brandMark::before {
-     /* content: '';
-     position: absolute;
-     top: 0;
-     left: 0;
-     right: 0;
-     height: 50%;
-     background: linear-gradient(180deg, rgba(255,255,255,0.25), transparent);
-     border-radius: 12px 12px 0 0; */
+     border-radius: 12px;
+     object-fit: cover;
+     display: block;
+     flex-shrink: 0;
+     box-shadow:
+       var(--shadow-sm),
+       0 0 24px -4px var(--accent-glow);
    }
    
    .brandName { 
@@ -1086,6 +1067,12 @@
   .shell--bookmarklet .footer,
   .shell--bookmarklet .nav {
     display: none;
+  }
+
+  /* Pin / “Access control” panel must not appear in the bookmarklet iframe */
+  .shell--bookmarklet #access,
+  .shell--bookmarklet section[aria-labelledby="accessTitle"] {
+    display: none !important;
   }
 
   .shell--bookmarklet .main {

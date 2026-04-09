@@ -92,6 +92,7 @@ Important operational constraints:
 - Staging and production must use `JOB_STATE_BACKEND=firestore`
 - All production instances must share the same Firestore backend and collection prefix
 - Crawl jobs are rate-limited and capped by backend hard limits
+- Active crawl jobs are hard-capped to `2` (`CRAWL_MAX_ACTIVE_JOBS`)
 - Frontend controls are aligned to the backend caps: `maxPages` up to `300`, `concurrency` up to `6`
 - The crawler is for public `http(s)` targets only; internal, loopback, link-local, and metadata destinations are blocked
 - Crawling stays on the same host as the start URL
@@ -237,6 +238,7 @@ GitHub Pages only serves the static docs and bookmarklet loader; crawls still ru
 ### Fly.io (optional)
 
 [`fly.toml`](fly.toml) is only relevant if you choose to deploy with [Fly.io](https://fly.io/) instead of (or in addition to) Cloud Run. Ignore it if you use Cloud Run only.
+The project Fly config caps running machines at `2` via `max_machines_running = 2`.
 
 ### Doc screenshots (Playwright)
 

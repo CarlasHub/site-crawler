@@ -169,7 +169,7 @@ const SERVER_CONFIG = {
     maxConcurrency: parseEnvInt("CRAWL_MAX_CONCURRENCY", 6, { min: 1, max: 64 }),
     defaultTimeoutMs: parseEnvInt("CRAWL_DEFAULT_TIMEOUT_MS", 12000, { min: 1000, max: 120000 }),
     maxTimeoutMs: parseEnvInt("CRAWL_MAX_TIMEOUT_MS", 30000, { min: 1000, max: 120000 }),
-    maxActiveJobs: parseEnvInt("CRAWL_MAX_ACTIVE_JOBS", 2, { min: 1, max: 100 }),
+    maxActiveJobs: parseEnvInt("CRAWL_MAX_ACTIVE_JOBS", 2, { min: 1, max: 2 }),
     maxQueuedJobs: parseEnvInt("CRAWL_MAX_QUEUED_JOBS", 20, { min: 0, max: 1000 }),
     maxRedirects: parseEnvInt("CRAWL_MAX_REDIRECTS", 10, { min: 1, max: 50 }),
     maxHtmlBytes: parseEnvInt("CRAWL_MAX_HTML_BYTES", 2 * 1024 * 1024, { min: 1024, max: 50 * 1024 * 1024 }),
