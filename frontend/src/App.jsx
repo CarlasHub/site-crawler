@@ -1,4 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  MAX_CONCURRENCY,
+  MAX_MAX_PAGES,
+  MIN_CONCURRENCY,
+  MIN_MAX_PAGES,
+  clamp,
+  executeCrawlFlow,
+  formatAuditReportLines,
+  sanitizeConcurrency,
+  sanitizeMaxPages
+} from "./crawl-runner.js";
 
 const STORAGE_KEY = "siteCrawlerPresets.v1";
 const LAST_USED_KEY = "siteCrawlerLastUsed.v1";
@@ -66,10 +77,6 @@ function baseWithoutQuery(url) {
   } catch {
     return url;
   }
-}
-
-function clamp(n, min, max) {
-  return Math.max(min, Math.min(max, n));
 }
 
 function sleep(ms) {
@@ -159,12 +166,12 @@ function wildcardToRegExp(pattern) {
 
 export default function App() {
   const [url, setUrl] = useState("");
-  const [excludePaths, setExcludePaths] = useState("/jobs\n/careers\n/apply\n/login\n/admin");
+  const [excludePaths, setExcludePaths] = useState("/jobs\n/careers\n/apply");
   const [pathLimits, setPathLimits] = useState([
     { id: makeId(), path: "/job", maxPages: 5 }
   ]);
-  const [maxPages, setMaxPages] = useState(300);
-  const [concurrency, setConcurrency] = useState(6);
+  const [maxPages, setMaxPages] = useState(MAX_MAX_PAGES);
+  const [concurrency, setConcurrency] = useState(MAX_CONCURRENCY);
   const [includeQuery, setIncludeQuery] = useState(true);
   const [ignoreJobPages, setIgnoreJobPages] = useState(true);
   const [brokenLinkCheck, setBrokenLinkCheck] = useState(false);
@@ -185,16 +192,35 @@ export default function App() {
   const [urlMatchPattern, setUrlMatchPattern] = useState("");
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search || "");
+    const mode = String(params.get("mode") || "").toLowerCase();
+    const flag = String(params.get("bookmarklet") || "").toLowerCase();
+    const targetUrl = params.get("url");
+    const inBookmarklet = mode === "bookmarklet" || flag === "1" || flag === "true";
+
     const stored = safeJsonParse(localStorage.getItem(STORAGE_KEY), []);
     setPresets(Array.isArray(stored) ? stored : []);
+
+    if (inBookmarklet) {
+      setIsBookmarklet(true);
+    }
+
+    if (inBookmarklet && targetUrl) {
+      try {
+        setUrl(String(new URL(targetUrl).href));
+      } catch {
+        setUrl(targetUrl);
+      }
+      return;
+    }
 
     const last = safeJsonParse(localStorage.getItem(LAST_USED_KEY), null);
     if (last) {
       setUrl(last.url || "");
-      setExcludePaths(last.excludePaths || "/jobs\n/careers\n/apply\n/login\n/admin");
+      setExcludePaths(last.excludePaths || "/jobs\n/careers\n/apply");
       setPathLimits(withRuleIds(Array.isArray(last.pathLimits) ? last.pathLimits : [{ path: "/job", maxPages: 5 }]));
-      setMaxPages(Number(last.maxPages || 300));
-      setConcurrency(Number(last.concurrency || 6));
+      setMaxPages(sanitizeMaxPages(last.maxPages));
+      setConcurrency(sanitizeConcurrency(last.concurrency));
       setIncludeQuery(!!last.includeQuery);
       setIgnoreJobPages(last.ignoreJobPages !== false);
       setBrokenLinkCheck(!!last.brokenLinkCheck);
@@ -202,21 +228,13 @@ export default function App() {
       setPresetName(last.presetName || "default");
       setUrlMatchPattern(last.urlMatchPattern || "");
     }
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search || "");
-    const mode = String(params.get("mode") || "").toLowerCase();
-    const flag = String(params.get("bookmarklet") || "").toLowerCase();
-    const targetUrl = params.get("url");
-
-    const inBookmarklet = mode === "bookmarklet" || flag === "1" || flag === "true";
-    if (inBookmarklet) {
-      setIsBookmarklet(true);
-    }
 
     if (targetUrl) {
-      setUrl(targetUrl);
+      try {
+        setUrl(String(new URL(targetUrl).href));
+      } catch {
+        setUrl(targetUrl);
+      }
     }
   }, []);
 
@@ -244,13 +262,6 @@ export default function App() {
       activeJobRef.current = "";
     };
   }, []);
-
-  const excludePathList = useMemo(() => {
-    return excludePaths
-      .split("\n")
-      .map((x) => x.trim())
-      .filter((x) => x.startsWith("/"));
-  }, [excludePaths]);
 
   const pageUrls = data?.urls || [];
   const auditEntries = data?.audit?.entries || pageUrls;
@@ -307,17 +318,6 @@ export default function App() {
     return groups;
   }, [pageUrls]);
 
-  const sanitizedPathLimits = useMemo(() => {
-    const cleaned = Array.isArray(pathLimits) ? pathLimits : [];
-    return cleaned
-      .map((r) => {
-        const p = String(r?.path || "").trim();
-        const max = clamp(Number(r?.maxPages || 0), 1, 5000);
-        return { path: p.startsWith("/") ? p : p ? `/${p}` : "", maxPages: max };
-      })
-      .filter((r) => r.path && r.path.startsWith("/") && r.path !== "/");
-  }, [pathLimits]);
-
   function pushNotice(type, message) {
     const cleanType = ["error", "warning", "success", "info"].includes(type) ? type : "info";
     const cleanMessage = String(message || "").trim();
@@ -368,8 +368,8 @@ export default function App() {
     setPresetName(p.name);
     setExcludePaths(p.settings.excludePaths || "");
     setPathLimits(withRuleIds(Array.isArray(p.settings.pathLimits) ? p.settings.pathLimits : [{ path: "/job", maxPages: 5 }]));
-    setMaxPages(Number(p.settings.maxPages || 300));
-    setConcurrency(Number(p.settings.concurrency || 6));
+    setMaxPages(sanitizeMaxPages(p.settings.maxPages));
+    setConcurrency(sanitizeConcurrency(p.settings.concurrency));
     setIncludeQuery(!!p.settings.includeQuery);
     setIgnoreJobPages(p.settings.ignoreJobPages !== false);
     setBrokenLinkCheck(!!p.settings.brokenLinkCheck);
@@ -411,105 +411,56 @@ export default function App() {
     setCrawlProgress(makeEmptyProgress());
     activeJobRef.current = "";
 
-    const trimmed = url.trim();
-    if (!trimmed) {
-      setError("Homepage URL is required.");
-      pushNotice("error", "Homepage URL is required.");
-      return;
-    }
-    if (!/^https?:\/\//i.test(trimmed)) {
-      setError("URL must start with http:// or https://");
-      pushNotice("error", "URL must start with http:// or https://");
-      return;
-    }
-
     setLoading(true);
-    setCrawlProgress({
-      ...makeEmptyProgress(),
-      phase: "setup",
-      message: "Starting crawl",
-      percent: 1,
-      maxPages: clamp(Number(maxPages || 300), 10, 5000)
-    });
 
     try {
-      const { res, json } = await fetchJsonWithRetry(
-        "/api/crawl/start",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url: trimmed,
-            options: {
-              excludePaths: excludePathList,
-              pathLimits: sanitizedPathLimits,
-              maxPages: clamp(Number(maxPages || 300), 10, 5000),
-              concurrency: clamp(Number(concurrency || 6), 1, 20),
-              includeQuery,
-              ignoreJobPages,
-              brokenLinkCheck,
-              parameterAudit,
-              patternMatchFilter: urlMatchPattern.trim()
-            }
-          })
+      const result = await executeCrawlFlow({
+        url,
+        excludePaths,
+        pathLimits,
+        maxPages,
+        concurrency,
+        includeQuery,
+        ignoreJobPages,
+        brokenLinkCheck,
+        parameterAudit,
+        urlMatchPattern,
+        fetchJsonWithRetry,
+        sleep,
+        activeJobRef,
+        onProgress: (nextProgress) => {
+          setCrawlProgress(nextProgress);
         },
-        { attempts: 3, retryDelayMs: 700 }
-      );
+        onNotice: (type, message) => {
+          pushNotice(type, message);
+        }
+      });
 
-      if (!res.ok) {
-        setError(json?.error || "Request failed");
-        pushNotice("error", json?.error || "Request failed");
+      if (result?.jobId) {
+        setCrawlJobId(result.jobId);
+      }
+
+      if (result?.cancelled) {
         setLoading(false);
         return;
       }
 
-      const jobId = String(json?.jobId || "").trim();
-      if (!jobId) {
-        throw new Error("Crawl job did not start.");
+      if (!result?.ok) {
+        const message = String(result?.error || "Request failed");
+        setError(message);
+        pushNotice("error", message);
+        setLoading(false);
+        activeJobRef.current = "";
+        return;
       }
 
-      activeJobRef.current = jobId;
-      setCrawlJobId(jobId);
-
-      while (activeJobRef.current === jobId) {
-        const { res: statusRes, json: statusJson } = await fetchJsonWithRetry(
-          `/api/crawl/${jobId}`,
-          { cache: "no-store" },
-          { attempts: 4, retryDelayMs: 700 }
-        );
-
-        if (!statusRes.ok) {
-          throw new Error(statusJson?.error || "Progress request failed");
-        }
-
-        if (statusJson?.progress) {
-          setCrawlProgress((prev) => ({
-            ...prev,
-            ...statusJson.progress
-          }));
-        }
-
-        if (statusJson?.status === "completed") {
-          setData(statusJson.result || null);
-          setCrawlProgress((prev) => ({
-            ...prev,
-            ...(statusJson.progress || {}),
-            phase: "complete",
-            message: "Crawl complete",
-            percent: 100
-          }));
-          pushNotice("success", "Crawl completed.");
-          setLoading(false);
-          activeJobRef.current = "";
-          return;
-        }
-
-        if (statusJson?.status === "failed") {
-          throw new Error(statusJson?.error || "Crawl failed");
-        }
-
-        await sleep(450);
+      setData(result.data || null);
+      if (result.progress) {
+        setCrawlProgress(result.progress);
       }
+      pushNotice("success", "Crawl completed.");
+      setLoading(false);
+      activeJobRef.current = "";
     } catch (err) {
       const message = String(err?.message || "Network error");
       setError(message);
@@ -521,25 +472,7 @@ export default function App() {
 
   function downloadUrls() {
     if (!matchedUrls.length) return;
-    const lines = matchedUrls.map((r) => {
-      const original = getEntryOriginalUrl(r);
-      const finalUrl = getEntryFinalUrl(r);
-      const source = r?.sourceType ? `${r.sourceType}: ${r.sourceValue || ""}` : "page";
-      const referrer = r?.referrerPage ? ` | referrer: ${r.referrerPage}` : "";
-      const redirect = finalUrl && finalUrl !== original ? ` -> ${finalUrl}` : "";
-      const status = r?.statusCode ?? r?.status;
-      const statusPart = status === null || status === undefined ? "" : ` [${status}]`;
-      const classification = r?.classification ? ` {${r.classification}}` : "";
-      const redirectFlags = [
-        r?.loopDetected ? "loop" : "",
-        r?.multipleHops ? "multi-hop" : "",
-        r?.paramsLost ? "params lost" : "",
-        r?.irrelevantDestination ? "irrelevant destination" : ""
-      ].filter(Boolean);
-      const redirectPart = redirectFlags.length ? ` | redirects: ${redirectFlags.join(", ")}` : "";
-      const softFailurePart = formatSoftFailureReasons(r) ? ` | soft failure: ${formatSoftFailureReasons(r)}` : "";
-      return `${source}${referrer} | ${original}${redirect}${statusPart}${classification}${redirectPart}${softFailurePart}`;
-    });
+    const lines = formatAuditReportLines(matchedUrls);
     downloadText("crawl-urls.txt", lines.join("\n"));
   }
 
@@ -650,7 +583,11 @@ export default function App() {
 
       <main id="main" className="main">
         {showProgressDock ? (
-          <div className={`progressDock${loading ? " isRunning" : ""}`} aria-live="polite">
+          <div
+            className={`progressDock${loading ? " isRunning" : ""}`}
+            aria-live="polite"
+            data-doc-screenshot="crawl-progress"
+          >
             <div className="progressDockHead">
               <div>
                 <div className="progressDockTitle">{loading ? "Crawl in progress" : "Last crawl"}</div>
@@ -694,7 +631,7 @@ export default function App() {
           </div>
         ) : null}
 
-        <section className="hero" aria-label="Overview">
+        <section className="hero" aria-label="Overview" data-doc-screenshot="dashboard">
           <div className="heroGrid">
             <div className="heroCopy">
               <h1 className="heroTitle">Crawl a site fast</h1>
@@ -776,7 +713,7 @@ export default function App() {
                   <div className="stepNum">2</div>
                   <div>
                     <h3>Add exclusions</h3>
-                    <p className="help">One path per line (e.g. `/jobs`, `/careers`, `/admin`). Only lines starting with `/` are used.</p>
+                    <p className="help">One path per line (e.g. `/jobs`, `/careers`, `/apply`). Only lines starting with `/` are used.</p>
                   </div>
                 </div>
 
@@ -792,7 +729,7 @@ export default function App() {
                   <div className="stepNum">4</div>
                   <div>
                     <h3>Choose options</h3>
-                    <p className="help">Max pages, concurrency, and toggles like “Ignore job pages” or “Broken link quick check.”</p>
+                    <p className="help">Max pages is capped at 300 and concurrency is capped at 6 to match backend enforcement.</p>
                   </div>
                 </div>
 
@@ -807,7 +744,7 @@ export default function App() {
             </div>
           </section>
 
-          <section id="runner" className="panel" aria-labelledby="runnerTitle">
+          <section id="runner" className="panel" aria-labelledby="runnerTitle" data-doc-screenshot="crawl-settings">
             <div className="panelHead">
               <h2 id="runnerTitle">Runner</h2>
               <div className="panelMeta">
@@ -894,10 +831,10 @@ export default function App() {
                             id={`limit-max-${i}`}
                             type="number"
                             min={1}
-                            max={5000}
+                            max={MAX_MAX_PAGES}
                             value={Number(pathLimits[i]?.maxPages || 0) || 5}
                             onChange={(e) => {
-                              const next = Number(e.target.value || 0);
+                              const next = clamp(Number(e.target.value || 0), 1, MAX_MAX_PAGES);
                               setPathLimits((rows) => {
                                 const copy = [...(Array.isArray(rows) ? rows : [])];
                                 copy[i] = { ...(copy[i] || {}), maxPages: next };
@@ -920,7 +857,7 @@ export default function App() {
                   )}
                 </div>
 
-                <p className="help">Caps how many pages are crawled for specific sections. Example: /job max 5 means only 5 pages under /job are crawled. Rules are language agnostic, so /job also matches /en/job, /fr/job, and similar.</p>
+                <p className="help">Caps how many pages are crawled for specific sections. Example: /job max 5 means only 5 pages under /job are crawled. Rules are language agnostic, so /job also matches /en/job, /fr/job, and similar. Per-path limits cannot exceed the overall 300-page crawl cap.</p>
               </div>
 
               <div className="field">
@@ -942,11 +879,12 @@ export default function App() {
                   <input
                     id="maxPages"
                     type="number"
-                    min={10}
-                    max={5000}
+                    min={MIN_MAX_PAGES}
+                    max={MAX_MAX_PAGES}
                     value={maxPages}
-                    onChange={(e) => setMaxPages(Number(e.target.value || 0))}
+                    onChange={(e) => setMaxPages(sanitizeMaxPages(e.target.value))}
                   />
+                  <p className="help">Allowed range: 1 to 300 pages. The backend enforces the same cap.</p>
                 </div>
 
                 <div className="field">
@@ -954,11 +892,12 @@ export default function App() {
                   <input
                     id="concurrency"
                     type="number"
-                    min={1}
-                    max={20}
+                    min={MIN_CONCURRENCY}
+                    max={MAX_CONCURRENCY}
                     value={concurrency}
-                    onChange={(e) => setConcurrency(Number(e.target.value || 1))}
+                    onChange={(e) => setConcurrency(sanitizeConcurrency(e.target.value))}
                   />
+                  <p className="help">Allowed range: 1 to 6 workers. Higher values are rejected by the backend.</p>
                 </div>
               </div>
 
@@ -1119,25 +1058,7 @@ export default function App() {
                 <textarea
                   id="urls"
                   readOnly
-                  value={matchedUrls.map((u) => {
-                    const original = getEntryOriginalUrl(u);
-                    const finalUrl = getEntryFinalUrl(u);
-                    const status = u.statusCode ?? u.status;
-                    const statusPart = status !== null && status !== undefined && status !== "" ? ` [${status}]` : "";
-                    const redirectPart = finalUrl && finalUrl !== original ? ` -> ${finalUrl}` : "";
-                    const sourcePart = u.sourceType ? `${u.sourceType}: ${u.sourceValue || ""}` : "page";
-                    const referrerPart = u.referrerPage ? ` | referrer: ${u.referrerPage}` : "";
-                    const classificationPart = u.classification ? ` | ${u.classification}` : "";
-                    const redirectFlags = [
-                      u.loopDetected ? "loop" : "",
-                      u.multipleHops ? "multi-hop" : "",
-                      u.paramsLost ? "params lost" : "",
-                      u.irrelevantDestination ? "irrelevant destination" : ""
-                    ].filter(Boolean);
-                    const redirectFlagPart = redirectFlags.length ? ` | redirects: ${redirectFlags.join(", ")}` : "";
-                    const softFailurePart = formatSoftFailureReasons(u) ? ` | soft failure: ${formatSoftFailureReasons(u)}` : "";
-                    return `${sourcePart}${referrerPart} | ${original}${statusPart}${redirectPart}${classificationPart}${redirectFlagPart}${softFailurePart}`;
-                  }).join("\n")}
+                  value={formatAuditReportLines(matchedUrls).join("\n")}
                   rows={14}
                 />
                 <p className="help">

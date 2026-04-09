@@ -1,17 +1,31 @@
 # ===============================
-# Node / npm
+# Dependencies
 # ===============================
 node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
 # ===============================
-# Vite / React
+# Build outputs
 # ===============================
+dist/
+build/
+coverage/
+.playwright/
+.playwright-browsers/
+scripts/pw-browsers/
+.cache/
+.tmp/
+tmp/
+.eslintcache
 frontend/dist/
+backend/.data/
 frontend/.vite/
+**/.vite/
+*.tsbuildinfo
 
 # ===============================
 # Environment variables
@@ -19,15 +33,10 @@ frontend/.vite/
 .env
 .env.*
 !.env.example
-.history
-.history.*
 
-# ===============================
-# Build / cache
-# ===============================
-.cache/
-.tmp/
-.eslintcache
+# This repository does not have a root package.json.
+# A root lockfile is accidental local output and should not be committed.
+/package-lock.json
 
 # ===============================
 # Logs
@@ -39,23 +48,28 @@ logs/
 # OS files
 # ===============================
 .DS_Store
+**/.DS_Store
 .AppleDouble
 .LSOverride
 
 # ===============================
-# Editor / IDE
+# Editor / IDE / local history
 # ===============================
 .vscode/
 .idea/
+.history/
+.history.*
 *.swp
+*.swo
+*~
 
 # ===============================
-# Docker
+# Docs assets
+# ===============================
+# Real captures live in docs/assets/screenshots/; this tree held older placeholder PNGs.
+docs/screenshots/
+
+# ===============================
+# Docker / local overrides
 # ===============================
 docker-compose.override.yml
-
-# ===============================
-# Test / coverage
-# ===============================
-coverage/
-.playwright/

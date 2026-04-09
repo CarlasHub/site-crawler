@@ -4,14 +4,19 @@
   "type": "module",
   "version": "1.0.0",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "lint": "node --check index.js && node --check job-store.js && node --check test/fetch.test.js && node --check test/job-store.test.js",
+    "build": "node --check index.js && node --check job-store.js",
+    "test": "node --test"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22 <23"
   },
   "dependencies": {
+    "@google-cloud/firestore": "^8.3.0",
     "cheerio": "^1.0.0",
     "express": "^4.19.2",
-    "robots-parser": "^3.0.1"
+    "robots-parser": "^3.0.1",
+    "undici": "^7.19.2"
   }
 }

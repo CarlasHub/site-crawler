@@ -2,6 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { assertAllowedLocalDocsOrigin, assertAllowedPublicAppOrigin } from "./lib/public-origin.mjs";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
@@ -119,6 +121,13 @@ function serializePublicConfig(config) {
 function writePublicConfig(options = {}) {
   const outputPath = path.resolve(options.outputPath || defaultOutputPath);
   const config = resolvePublicConfig(options);
+
+  if (config.environment === "local") {
+    assertAllowedLocalDocsOrigin(config.appOrigin);
+  } else {
+    assertAllowedPublicAppOrigin(config.appOrigin);
+  }
+
   const output = serializePublicConfig(config);
 
   fs.writeFileSync(outputPath, output, "utf8");

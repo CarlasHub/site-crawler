@@ -5,8 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "lint": "node --check vite.config.js && node --check src/polling.js && node --check src/polling.test.js && node --check src/crawl-runner.js && node --check src/crawl-runner.test.js",
     "build": "vite build",
+    "test": "node --test src/polling.test.js src/crawl-runner.test.js && npm run build",
     "preview": "vite preview"
+  },
+  "engines": {
+    "node": ">=22 <23"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -14,6 +19,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "playwright": "^1.59.1",
     "vite": "^5.4.2"
   }
 }

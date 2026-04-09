@@ -1,4 +1,7 @@
 (() => {
+  const ROOT_ID = "cat-crawler-root";
+  const LOAD_TIMEOUT_MS = 45000;
+
   function getCurrentScriptSource() {
     const current = document.currentScript;
     if (current && typeof current.src === "string" && current.src) return current.src;
@@ -39,28 +42,126 @@
     return;
   }
 
-  const ROOT_ID = "cat-crawler-root";
+  const targetHref = `${APP_ORIGIN}/?mode=bookmarklet&url=${encodeURIComponent(window.location.href)}`;
+
+  const existing = document.getElementById(ROOT_ID);
+  if (existing) {
+    existing.classList.remove("is-minimised");
+    const iframe = existing.querySelector(".cat-crawler-iframe");
+    const panel = existing.querySelector(".cat-crawler-panel");
+    if (panel) {
+      panel.classList.add("is-open");
+    }
+
+    if (iframe) {
+      const last = iframe.getAttribute("data-cc-src");
+      if (last !== targetHref) {
+        iframe.setAttribute("data-cc-src", targetHref);
+        armLoadWatchers(existing, iframe);
+        iframe.src = targetHref;
+      } else {
+        hideLoading(existing);
+      }
+    }
+    hideError(existing);
+    return;
+  }
+
   const PANEL_MIN_WIDTH = 320;
   const PANEL_MIN_HEIGHT = 280;
   const PANEL_MARGIN = 16;
   const BUTTON_SIZE = 56;
   const BUTTON_GAP = 16;
   const BAR_HEIGHT = 44;
-  const existing = document.getElementById(ROOT_ID);
-
-  if (existing) {
-    if (typeof existing.__catCrawlerCleanup === "function") {
-      existing.__catCrawlerCleanup();
-    } else {
-      existing.remove();
-    }
-    return;
-  }
 
   const root = document.createElement("div");
   root.id = ROOT_ID;
   const controller = new AbortController();
   const { signal } = controller;
+
+  let loadTimer = null;
+
+  function showLoading(host) {
+    const layer = host.querySelector(".cat-crawler-loading");
+    const err = host.querySelector(".cat-crawler-error");
+    if (err) {
+      err.classList.remove("is-visible");
+      err.setAttribute("hidden", "");
+    }
+    if (layer) {
+      layer.classList.remove("is-hidden");
+      layer.removeAttribute("hidden");
+    }
+  }
+
+  function hideLoading(host) {
+    const layer = host.querySelector(".cat-crawler-loading");
+    if (layer) {
+      layer.classList.add("is-hidden");
+      layer.setAttribute("hidden", "");
+    }
+  }
+
+  function showError(host, message) {
+    hideLoading(host);
+    const err = host.querySelector(".cat-crawler-error");
+    const text = host.querySelector(".cat-crawler-error-text");
+    if (text) text.textContent = message;
+    if (err) {
+      err.classList.add("is-visible");
+      err.removeAttribute("hidden");
+    }
+  }
+
+  function hideError(host) {
+    const err = host.querySelector(".cat-crawler-error");
+    if (err) {
+      err.classList.remove("is-visible");
+      err.setAttribute("hidden", "");
+    }
+  }
+
+  function clearLoadTimer() {
+    if (loadTimer) {
+      window.clearTimeout(loadTimer);
+      loadTimer = null;
+    }
+  }
+
+  function armLoadWatchers(host, iframe) {
+    const prevAbort = host.__catCrawlerLoadAbort;
+    if (prevAbort && typeof prevAbort.abort === "function") {
+      prevAbort.abort();
+    }
+    const loadAbort = new AbortController();
+    host.__catCrawlerLoadAbort = loadAbort;
+    const ls = loadAbort.signal;
+
+    clearLoadTimer();
+    showLoading(host);
+    hideError(host);
+
+    loadTimer = window.setTimeout(() => {
+      loadTimer = null;
+      showError(
+        host,
+        `Cat Crawler did not load within ${Math.round(LOAD_TIMEOUT_MS / 1000)}s. Check your network, blockers, and that the app is reachable at ${APP_ORIGIN}.`
+      );
+    }, LOAD_TIMEOUT_MS);
+
+    const onDone = () => {
+      clearLoadTimer();
+      hideLoading(host);
+    };
+
+    iframe.addEventListener(
+      "load",
+      () => {
+        onDone();
+      },
+      { once: true, signal: ls }
+    );
+  }
 
   const style = document.createElement("style");
   style.textContent = `
@@ -76,6 +177,7 @@
       pointer-events: auto;
     }
     #${ROOT_ID} .cat-crawler-button {
+      display: none;
       position: fixed;
       right: ${BUTTON_GAP}px;
       bottom: ${BUTTON_GAP}px;
@@ -86,10 +188,17 @@
       background: #0f0f0f url("${APP_ORIGIN}/cat.png") center / cover no-repeat;
       box-shadow: 0 8px 24px rgba(0,0,0,0.35);
       cursor: pointer;
+      padding: 0;
+    }
+    #${ROOT_ID}.is-minimised .cat-crawler-button {
+      display: block;
+    }
+    #${ROOT_ID}.is-minimised .cat-crawler-panel {
+      display: none !important;
     }
     #${ROOT_ID} .cat-crawler-panel {
       position: fixed;
-      display: none;
+      display: block;
       border-radius: 16px;
       border: 1px solid rgba(0,0,0,0.2);
       background: #0b0b0b;
@@ -98,15 +207,12 @@
       min-width: ${PANEL_MIN_WIDTH}px;
       min-height: ${PANEL_MIN_HEIGHT}px;
     }
-    #${ROOT_ID} .cat-crawler-panel.is-open {
-      display: block;
-    }
     #${ROOT_ID} .cat-crawler-panel.is-dragging,
     #${ROOT_ID} .cat-crawler-panel.is-resizing {
       user-select: none;
     }
-    #${ROOT_ID} .cat-crawler-panel.is-dragging iframe,
-    #${ROOT_ID} .cat-crawler-panel.is-resizing iframe {
+    #${ROOT_ID} .cat-crawler-panel.is-dragging .cat-crawler-iframe,
+    #${ROOT_ID} .cat-crawler-panel.is-resizing .cat-crawler-iframe {
       pointer-events: none;
     }
     #${ROOT_ID} .cat-crawler-bar {
@@ -124,12 +230,17 @@
       cursor: move;
       touch-action: none;
     }
+    #${ROOT_ID} .cat-crawler-bar-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
     #${ROOT_ID} .cat-crawler-title {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    #${ROOT_ID} .cat-crawler-close {
+    #${ROOT_ID} .cat-crawler-bar button {
       border: 1px solid rgba(255,255,255,0.2);
       background: transparent;
       color: #fff;
@@ -138,20 +249,64 @@
       cursor: pointer;
       font-size: 12px;
       font-weight: 600;
-      flex: 0 0 auto;
     }
-    #${ROOT_ID} iframe {
-      width: 100%;
+    #${ROOT_ID} .cat-crawler-body {
+      position: relative;
       height: calc(100% - ${BAR_HEIGHT}px);
+      background: #0b0b0b;
+    }
+    #${ROOT_ID} .cat-crawler-loading,
+    #${ROOT_ID} .cat-crawler-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 20px;
+      background: #0b0b0b;
+      color: #e8e8e8;
+      font-size: 14px;
+      line-height: 1.45;
+      text-align: center;
+      z-index: 2;
+    }
+    #${ROOT_ID} .cat-crawler-loading.is-hidden,
+    #${ROOT_ID} .cat-crawler-error[hidden] {
+      display: none !important;
+    }
+    #${ROOT_ID} .cat-crawler-error:not(.is-visible) {
+      display: none !important;
+    }
+    #${ROOT_ID} .cat-crawler-error.is-visible {
+      display: flex !important;
+    }
+    #${ROOT_ID} .cat-crawler-spinner {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: rgba(255,255,255,0.85);
+      animation: cat-crawler-spin 0.85s linear infinite;
+    }
+    @keyframes cat-crawler-spin {
+      to { transform: rotate(360deg); }
+    }
+    #${ROOT_ID} .cat-crawler-iframe {
+      width: 100%;
+      height: 100%;
       border: 0;
       background: #0b0b0b;
       display: block;
+      position: relative;
+      z-index: 1;
     }
     #${ROOT_ID} .cat-crawler-handle {
       position: absolute;
       width: 16px;
       height: 16px;
-      z-index: 2;
+      z-index: 3;
       touch-action: none;
     }
     #${ROOT_ID} .cat-crawler-handle::before {
@@ -169,13 +324,8 @@
     #${ROOT_ID} .cat-crawler-handle-se { bottom: -8px; right: -8px; cursor: nwse-resize; }
   `;
 
-  const button = document.createElement("button");
-  button.className = "cat-crawler-button";
-  button.title = "Cat Crawler";
-  button.type = "button";
-
   const panel = document.createElement("div");
-  panel.className = "cat-crawler-panel";
+  panel.className = "cat-crawler-panel is-open";
 
   const bar = document.createElement("div");
   bar.className = "cat-crawler-bar";
@@ -184,15 +334,52 @@
   title.className = "cat-crawler-title";
   title.textContent = "Cat Crawler";
 
+  const barActions = document.createElement("div");
+  barActions.className = "cat-crawler-bar-actions";
+
+  const minimiseBtn = document.createElement("button");
+  minimiseBtn.type = "button";
+  minimiseBtn.textContent = "Hide";
+  minimiseBtn.setAttribute("aria-label", "Hide Cat Crawler panel");
+
   const closeBtn = document.createElement("button");
-  closeBtn.className = "cat-crawler-close";
   closeBtn.type = "button";
   closeBtn.textContent = "Close";
+  closeBtn.setAttribute("aria-label", "Close Cat Crawler");
+
+  const body = document.createElement("div");
+  body.className = "cat-crawler-body";
+
+  const loading = document.createElement("div");
+  loading.className = "cat-crawler-loading";
+  loading.setAttribute("role", "status");
+  loading.setAttribute("aria-live", "polite");
+  const spinner = document.createElement("div");
+  spinner.className = "cat-crawler-spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  const loadingText = document.createElement("div");
+  loadingText.textContent = "Loading Cat Crawler…";
+  loading.appendChild(spinner);
+  loading.appendChild(loadingText);
+
+  const errorBox = document.createElement("div");
+  errorBox.className = "cat-crawler-error";
+  errorBox.setAttribute("role", "alert");
+  errorBox.setAttribute("hidden", "");
+  const errorText = document.createElement("div");
+  errorText.className = "cat-crawler-error-text";
+  errorBox.appendChild(errorText);
 
   const iframe = document.createElement("iframe");
-  const targetUrl = encodeURIComponent(window.location.href);
-  iframe.src = `${APP_ORIGIN}/?mode=bookmarklet&url=${targetUrl}`;
+  iframe.className = "cat-crawler-iframe";
   iframe.title = "Cat Crawler";
+  iframe.setAttribute("data-cc-src", targetHref);
+
+  const button = document.createElement("button");
+  button.className = "cat-crawler-button";
+  button.title = "Show Cat Crawler";
+  button.type = "button";
+  button.setAttribute("aria-label", "Show Cat Crawler panel");
 
   const state = {
     left: 0,
@@ -224,9 +411,9 @@
   function getDefaultPanelRect() {
     const viewport = getViewportRect();
     const width = clamp(Math.min(520, Math.floor(viewport.width * 0.92)), PANEL_MIN_WIDTH, Math.max(PANEL_MIN_WIDTH, viewport.width - PANEL_MARGIN * 2));
-    const height = clamp(Math.min(680, Math.floor(viewport.height * 0.8)), PANEL_MIN_HEIGHT, Math.max(PANEL_MIN_HEIGHT, viewport.height - PANEL_MARGIN * 2));
+    const height = clamp(Math.min(680, Math.floor(viewport.height * 0.82)), PANEL_MIN_HEIGHT, Math.max(PANEL_MIN_HEIGHT, viewport.height - PANEL_MARGIN * 2));
     const left = clamp(viewport.width - width - PANEL_MARGIN, PANEL_MARGIN, Math.max(PANEL_MARGIN, viewport.width - width - PANEL_MARGIN));
-    const top = clamp(viewport.height - height - BUTTON_SIZE - BUTTON_GAP * 2, PANEL_MARGIN, Math.max(PANEL_MARGIN, viewport.height - height - PANEL_MARGIN));
+    const top = clamp(PANEL_MARGIN, PANEL_MARGIN, Math.max(PANEL_MARGIN, viewport.height - height - PANEL_MARGIN));
     return { left, top, width, height };
   }
 
@@ -356,55 +543,95 @@
     applyPanelRect();
   }
 
-  closeBtn.addEventListener("click", () => {
-    finishInteraction();
-    panel.classList.remove("is-open");
-  }, { signal });
+  closeBtn.addEventListener(
+    "click",
+    () => {
+      finishInteraction();
+      clearLoadTimer();
+      controller.abort();
+      root.remove();
+    },
+    { signal }
+  );
 
-  button.addEventListener("click", () => {
-    if (!panel.classList.contains("is-open")) {
+  minimiseBtn.addEventListener(
+    "click",
+    () => {
+      finishInteraction();
+      root.classList.add("is-minimised");
+    },
+    { signal }
+  );
+
+  button.addEventListener(
+    "click",
+    () => {
+      root.classList.remove("is-minimised");
       ensureOpenRect();
-    }
-    panel.classList.toggle("is-open");
-  }, { signal });
+    },
+    { signal }
+  );
 
-  bar.addEventListener("pointerdown", (event) => {
-    if (event.target.closest(".cat-crawler-close")) return;
-    startInteraction(event, "drag", "");
-  }, { signal });
+  bar.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.target.closest("button")) return;
+      startInteraction(event, "drag", "");
+    },
+    { signal }
+  );
 
   ["nw", "ne", "sw", "se"].forEach((corner) => {
     const handle = document.createElement("div");
     handle.className = `cat-crawler-handle cat-crawler-handle-${corner}`;
-    handle.dataset.handle = corner;
-    handle.addEventListener("pointerdown", (event) => {
-      startInteraction(event, "resize", corner);
-    }, { signal });
+    handle.addEventListener(
+      "pointerdown",
+      (event) => {
+        startInteraction(event, "resize", corner);
+      },
+      { signal }
+    );
     panel.appendChild(handle);
   });
 
   window.addEventListener("pointermove", handlePointerMove, { signal });
   window.addEventListener("pointerup", handlePointerEnd, { signal });
   window.addEventListener("pointercancel", handlePointerEnd, { signal });
-  window.addEventListener("resize", () => {
-    if (panel.classList.contains("is-open")) {
-      applyPanelRect();
-    }
-  }, { signal });
+  window.addEventListener(
+    "resize",
+    () => {
+      if (!root.classList.contains("is-minimised")) {
+        applyPanelRect();
+      }
+    },
+    { signal }
+  );
 
   Object.assign(state, getDefaultPanelRect());
   applyPanelRect();
 
+  barActions.appendChild(minimiseBtn);
+  barActions.appendChild(closeBtn);
   bar.appendChild(title);
-  bar.appendChild(closeBtn);
+  bar.appendChild(barActions);
+  body.appendChild(loading);
+  body.appendChild(errorBox);
+  body.appendChild(iframe);
   panel.appendChild(bar);
-  panel.appendChild(iframe);
+  panel.appendChild(body);
 
   root.appendChild(style);
-  root.appendChild(button);
   root.appendChild(panel);
+  root.appendChild(button);
   document.body.appendChild(root);
+
+  armLoadWatchers(root, iframe);
+  iframe.src = targetHref;
+
   root.__catCrawlerCleanup = () => {
+    clearLoadTimer();
+    const la = root.__catCrawlerLoadAbort;
+    if (la && typeof la.abort === "function") la.abort();
     controller.abort();
     root.remove();
   };

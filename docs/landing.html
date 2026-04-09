@@ -423,6 +423,13 @@
         border-bottom: 1px solid var(--line);
       }
 
+      .media-frame__shot {
+        display: block;
+        width: 100%;
+        height: auto;
+        vertical-align: middle;
+      }
+
       .media-frame__chrome {
         display: flex;
         align-items: center;
@@ -1238,50 +1245,26 @@
 
           <figure class="media-frame" id="doc-preview-hero" aria-labelledby="ppt-hero-title">
             <div class="media-frame__head">
-              <h3 class="media-frame__h" id="ppt-hero-title">Validation report snapshot</h3>
-              <p class="media-frame__sub">Wireframe preview · replace with product UI</p>
+              <h3 class="media-frame__h" id="ppt-hero-title">Validation report</h3>
+              <p class="media-frame__sub">Live UI after a crawl</p>
             </div>
             <div class="media-frame__viewport">
               <div class="media-frame__chrome" aria-hidden="true">
                 <span class="media-frame__dots"><span></span><span></span><span></span></span>
-                <span class="media-frame__url">Cat Crawler · Example run</span>
+                <span class="media-frame__url">Cat Crawler · Validation report</span>
               </div>
-              <div class="wf-stage">
-                <div class="preview-shell">
-                  <div class="preview-body">
-                    <div class="preview-header">
-                      <div>
-                        <strong>Validation report</strong>
-                        <p>Broken URLs, redirects, parameters, soft failures, and impact—grouped for triage.</p>
-                      </div>
-                      <span class="pill">In progress</span>
-                    </div>
-                    <div class="mini-stat-grid">
-                      <div class="mini-stat"><strong>142</strong><span>Pages crawled</span></div>
-                      <div class="mini-stat"><strong>9</strong><span>Redirect issues</span></div>
-                      <div class="mini-stat"><strong>6</strong><span>Soft failures</span></div>
-                    </div>
-                    <div class="preview-list">
-                      <div class="preview-item">
-                        <span>Redirect audit</span><span>Loop and multi-hop checks</span>
-                      </div>
-                      <div class="preview-item">
-                        <span>Parameter audit</span><span>Preserved or dropped params</span>
-                      </div>
-                      <div class="preview-item">
-                        <span>Presets and exports</span><span>Repeatable client runs</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <img
+                class="media-frame__shot"
+                src="./assets/screenshots/05-validation-report.png"
+                width="1280"
+                height="860"
+                alt="Cat Crawler validation report section expanded in the live app"
+                loading="eager"
+                decoding="async"
+              />
             </div>
             <figcaption class="media-frame__spec">
-              <span class="media-frame__spec-label">Screenshot spec</span>
-              <p>
-                Crop the live validation summary: headline, stat row, and one or two audit rows so the hero matches real
-                product chrome.
-              </p>
+              <p>Captured with Playwright against a running instance (demo crawl).</p>
             </figcaption>
           </figure>
         </div>
@@ -1390,9 +1373,7 @@
           <header class="section__intro">
             <p class="kicker">Product</p>
             <h2 id="features-heading" class="section__title">Built for review, not just collection</h2>
-            <p class="section__lede">
-              Each block maps to the live app. Frames below are wireframes—swap in real screenshots when you are ready.
-            </p>
+            <p class="section__lede">Each block maps to the live app. Screenshots below are captured from a real run.</p>
           </header>
 
           <div class="showcase-stack">
@@ -1418,39 +1399,25 @@
               <figure class="media-frame" id="doc-preview-dashboard" aria-labelledby="ppt-dashboard-title">
                 <div class="media-frame__head">
                   <h3 id="ppt-dashboard-title">Main dashboard and progress</h3>
-                  <p class="media-frame__sub">Runner shell during an active crawl</p>
+                  <p class="media-frame__sub">Hero and progress ring</p>
                 </div>
                 <div class="media-frame__viewport">
                   <div class="media-frame__chrome" aria-hidden="true">
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
                     <span class="media-frame__url">Cat Crawler · Dashboard</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--dash">
-                    <div class="wf-pane">
-                      <div class="wf-pill"></div>
-                      <div class="wf-pill wf-pill--s"></div>
-                      <div class="wf-pill"></div>
-                      <div class="wf-pill wf-pill--s"></div>
-                    </div>
-                    <div>
-                      <div class="wf-grid3">
-                        <div class="wf-stat"><div class="wf-stat__k"></div><div class="wf-stat__v"></div></div>
-                        <div class="wf-stat"><div class="wf-stat__k"></div><div class="wf-stat__v"></div></div>
-                        <div class="wf-stat"><div class="wf-stat__k"></div><div class="wf-stat__v"></div></div>
-                      </div>
-                      <div class="wf-pane" style="margin-top: 0.65rem">
-                        <div class="wf-bar wf-bar--b" style="width: 36%; margin-bottom: 0.5rem"></div>
-                        <div class="wf-bar wf-bar--a"></div>
-                        <div class="wf-bar"></div>
-                        <div class="wf-bar wf-bar--narrow"></div>
-                        <div class="wf-bar"></div>
-                      </div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/01-dashboard.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler dashboard with progress summary"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>Full-width runner: job phase, progress bar, and counters as shown during a live crawl.</p>
+                  <p>Standard app shell with start URL supplied via <code>?url=</code> (same prefill mechanism the bookmarklet uses).</p>
                 </figcaption>
               </figure>
             </article>
@@ -1483,25 +1450,56 @@
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
                     <span class="media-frame__url">Cat Crawler · Crawl settings</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--split">
-                    <div class="wf-pane">
-                      <span class="wf-chip">Start URL</span>
-                      <div class="wf-block wf-block--a"></div>
-                      <span class="wf-chip">Exclude paths</span>
-                      <div class="wf-block"></div>
-                      <div class="wf-block"></div>
-                    </div>
-                    <div class="wf-pane">
-                      <span class="wf-chip">Options</span>
-                      <div class="wf-block wf-block--b"></div>
-                      <div class="wf-block"></div>
-                      <div class="wf-block wf-block--tall"></div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/02-crawl-settings.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler runner form with URL, excludes, and options"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>Start URL field, exclude paths, path limits, and toggles for broken links and parameter audit.</p>
+                  <p>Runner section: scope, limits, and crawl options.</p>
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="showcase showcase--flip">
+              <div>
+                <p class="showcase__kicker">Progress</p>
+                <h3 class="showcase__title">Active crawl</h3>
+                <p class="showcase__body">
+                  While a job runs, the dock shows phase, percent, and counters so you can tell whether the crawl is still moving.
+                </p>
+                <ul>
+                  <li>Queued, discovered, and crawled counts</li>
+                  <li>Optional navigation and parameter audit progress</li>
+                </ul>
+              </div>
+              <figure class="media-frame" id="doc-preview-progress" aria-labelledby="ppt-progress-title">
+                <div class="media-frame__head">
+                  <h3 id="ppt-progress-title">Crawl in progress</h3>
+                  <p class="media-frame__sub">Progress dock during a run</p>
+                </div>
+                <div class="media-frame__viewport">
+                  <div class="media-frame__chrome" aria-hidden="true">
+                    <span class="media-frame__dots"><span></span><span></span><span></span></span>
+                    <span class="media-frame__url">Cat Crawler · Progress</span>
+                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/03-active-crawl.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler progress dock while a crawl is running"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <figcaption class="media-frame__spec">
+                  <p>Captured mid-run against a demo crawl.</p>
                 </figcaption>
               </figure>
             </article>
@@ -1527,30 +1525,25 @@
               <figure class="media-frame" id="doc-preview-validation" aria-labelledby="ppt-validation-title">
                 <div class="media-frame__head">
                   <h3 id="ppt-validation-title">Main validation report</h3>
-                  <p class="media-frame__sub">Grouped issues above the fold</p>
+                  <p class="media-frame__sub">Grouped issues</p>
                 </div>
                 <div class="media-frame__viewport">
                   <div class="media-frame__chrome" aria-hidden="true">
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
                     <span class="media-frame__url">Cat Crawler · Validation report</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--split">
-                    <div class="wf-pane">
-                      <span class="wf-chip">Broken URLs</span>
-                      <div class="wf-bar wf-bar--d"></div>
-                      <div class="wf-bar"></div>
-                      <div class="wf-bar wf-bar--narrow"></div>
-                    </div>
-                    <div class="wf-pane">
-                      <span class="wf-chip">Issue summary</span>
-                      <div class="wf-block wf-block--a"></div>
-                      <div class="wf-block wf-block--b"></div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/05-validation-report.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler validation report details"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>Grouped validation: broken URLs, redirect and parameter callouts, soft failures, and impact.</p>
+                  <p>Validation report block opened after crawl.</p>
                 </figcaption>
               </figure>
             </article>
@@ -1582,23 +1575,18 @@
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
                     <span class="media-frame__url">Cat Crawler · Redirect audit</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--split">
-                    <div class="wf-pane">
-                      <span class="wf-chip">Chain</span>
-                      <div class="wf-bar wf-bar--a"></div>
-                      <div class="wf-bar wf-bar--w"></div>
-                      <div class="wf-bar wf-bar--d wf-bar--narrow"></div>
-                    </div>
-                    <div class="wf-pane">
-                      <span class="wf-chip">Destination</span>
-                      <div class="wf-block wf-block--a"></div>
-                      <div class="wf-block"></div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/06-redirect-audit.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler redirect audit section"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>At least one multi-hop chain, step list or status codes, and loop or dropped-query flags if visible.</p>
+                  <p>Redirect audit details when issues exist; otherwise the section summarises zero issues.</p>
                 </figcaption>
               </figure>
             </article>
@@ -1631,24 +1619,18 @@
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
                     <span class="media-frame__url">Cat Crawler · Parameter audit</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--split">
-                    <div class="wf-pane">
-                      <span class="wf-chip">Base URL</span>
-                      <div class="wf-block wf-block--a"></div>
-                      <span class="wf-chip">Variant</span>
-                      <div class="wf-block wf-block--b"></div>
-                    </div>
-                    <div class="wf-pane">
-                      <span class="wf-chip">Result</span>
-                      <div class="wf-bar wf-bar--w"></div>
-                      <div class="wf-bar"></div>
-                      <div class="wf-bar wf-bar--d wf-bar--narrow"></div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/07-parameter-audit.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler parameter audit section"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>Base URL, tested variant, outcome, and final URL as in the app table or cards.</p>
+                  <p>Shown with parameter audit enabled for the demo crawl.</p>
                 </figcaption>
               </figure>
             </article>
@@ -1674,30 +1656,25 @@
               <figure class="media-frame" id="doc-preview-patterns" aria-labelledby="ppt-patterns-title">
                 <div class="media-frame__head">
                   <h3 id="ppt-patterns-title">Soft failures, patterns, and duplicates</h3>
-                  <p class="media-frame__sub">Split or stacked layout</p>
+                  <p class="media-frame__sub">Issue grouping</p>
                 </div>
                 <div class="media-frame__viewport">
                   <div class="media-frame__chrome" aria-hidden="true">
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
-                    <span class="media-frame__url">Cat Crawler · Patterns &amp; soft failures</span>
+                    <span class="media-frame__url">Cat Crawler · Soft failures</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--split">
-                    <div class="wf-pane">
-                      <span class="wf-chip">Soft failure</span>
-                      <div class="wf-bar wf-bar--d"></div>
-                      <div class="wf-bar"></div>
-                      <div class="wf-bar wf-bar--narrow"></div>
-                    </div>
-                    <div class="wf-pane">
-                      <span class="wf-chip">Pattern groups</span>
-                      <div class="wf-block wf-block--b"></div>
-                      <div class="wf-block"></div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/08-soft-failures.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler soft failures or validation grouping in the results area"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>Soft-failure signals on one side, pattern or duplicate groupings on the other—match product layout.</p>
+                  <p>Soft failures when present; otherwise a validation summary may appear for thin crawls.</p>
                 </figcaption>
               </figure>
             </article>
@@ -1749,31 +1726,26 @@
 
               <figure class="media-frame" id="doc-preview-reports" aria-labelledby="ppt-reports-title">
                 <div class="media-frame__head">
-                  <h3 id="ppt-reports-title">Reports and exports</h3>
-                  <p class="media-frame__sub">Audit list, summaries, export actions</p>
+                  <h3 id="ppt-reports-title">Audit report</h3>
+                  <p class="media-frame__sub">Primary text report field</p>
                 </div>
                 <div class="media-frame__viewport">
                   <div class="media-frame__chrome" aria-hidden="true">
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
-                    <span class="media-frame__url">Cat Crawler · Reports overview</span>
+                    <span class="media-frame__url">Cat Crawler · Audit report</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--split">
-                    <div class="wf-pane">
-                      <span class="wf-chip">Audit report</span>
-                      <div class="wf-bar"></div>
-                      <div class="wf-bar wf-bar--narrow"></div>
-                      <div class="wf-bar wf-bar--narrow"></div>
-                    </div>
-                    <div class="wf-pane">
-                      <span class="wf-chip">Exports</span>
-                      <div class="wf-block wf-block--a"></div>
-                      <div class="wf-block"></div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/04-audit-report.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler audit report textarea after a crawl"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>Flow between audit list, grouped summaries, and TXT/CSV controls if visible in UI.</p>
+                  <p>Audit report lines derived from the same demo crawl as the other shots.</p>
                 </figcaption>
               </figure>
             </div>
@@ -1787,8 +1759,8 @@
             <p class="kicker">Bookmarklet</p>
             <h2 id="bookmarklet-heading" class="section__title">Open Cat Crawler from the page you are on</h2>
             <p class="section__lede">
-              Loads <code>docs/bookmarklet.js</code> from this site, reads <code>appOrigin</code>, then opens your deployed app in a
-              floating panel with the start URL prefilled.
+              Loads <code>docs/bookmarklet.js</code> from this site, reads <code>appOrigin</code>, then opens the full panel immediately
+              with the app in an iframe and the current tab URL prefilled.
             </p>
           </header>
 
@@ -1797,10 +1769,11 @@
               <div>
                 <h3>What it does</h3>
                 <ul>
-                  <li>Injects a floating launcher and panel into the current page.</li>
-                  <li>Loads the app from <span data-app-origin>configured app origin</span>.</li>
-                  <li>Passes the current page URL as the starting URL.</li>
-                  <li>Lets you drag the panel and resize from the corners.</li>
+                  <li>Opens the full Cat Crawler panel on first use (Hide collapses to a small control; Show restores it).</li>
+                  <li>Loads the app from <span data-app-origin>configured app origin</span> inside the panel iframe.</li>
+                  <li>Passes the current page URL as the starting URL; running the bookmarklet again on another page refreshes the iframe.</li>
+                  <li>Re-running the bookmarklet focuses the same instance—no duplicate panels.</li>
+                  <li>Drag the title bar to move; resize from the corners.</li>
                 </ul>
                 <aside class="callout">
                   <strong>Important</strong>
@@ -1819,36 +1792,32 @@
                 <p class="config-note">
                   Current docs config:
                   <span data-docs-environment>local</span>
-                  · app origin <code data-app-origin>http://localhost:8080</code>
+                  · app origin <code data-app-origin>(from docs/config.js)</code>
                 </p>
               </div>
 
               <figure class="media-frame" id="doc-preview-bookmarklet" aria-labelledby="ppt-bookmarklet-title">
                 <div class="media-frame__head">
-                  <h3 id="ppt-bookmarklet-title">Floating panel</h3>
-                  <p class="media-frame__sub">Launcher + iframe over a real page</p>
+                  <h3 id="ppt-bookmarklet-title">Bookmarklet mode</h3>
+                  <p class="media-frame__sub">Same app with <code>?mode=bookmarklet</code></p>
                 </div>
                 <div class="media-frame__viewport">
                   <div class="media-frame__chrome" aria-hidden="true">
                     <span class="media-frame__dots"><span></span><span></span><span></span></span>
-                    <span class="media-frame__url">Example host · bookmarklet open</span>
+                    <span class="media-frame__url">Cat Crawler · Bookmarklet shell</span>
                   </div>
-                  <div class="wf-stage wf-canvas wf-canvas--split">
-                    <div class="wf-pane">
-                      <span class="wf-chip">Launcher</span>
-                      <div class="wf-block wf-block--a"></div>
-                      <div class="wf-block"></div>
-                    </div>
-                    <div class="wf-pane">
-                      <span class="wf-chip">App frame</span>
-                      <div class="wf-block wf-block--tall wf-block--b"></div>
-                      <div class="wf-bar"></div>
-                    </div>
-                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/09-bookmarklet-mode.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler UI in bookmarklet mode with prefilled start URL"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <span class="media-frame__spec-label">Screenshot spec</span>
-                  <p>Launcher chip and iframe over real page background—scale, drag handles, prefilled start URL.</p>
+                  <p>Full in-panel iframe matches this view; the bookmarklet adds chrome, loading state, and error handling around it.</p>
                 </figcaption>
               </figure>
             </div>
@@ -1924,7 +1893,7 @@
                   <li>Run <code>npm ci</code> in <code>frontend/</code> and <code>backend/</code>.</li>
                   <li>Build the frontend with <code>npm run build</code> in <code>frontend/</code>.</li>
                   <li>Start the backend with <code>npm start</code> in <code>backend/</code>.</li>
-                  <li>Local docs config defaults to <code>http://localhost:8080</code>.</li>
+                  <li>Regenerate <code>docs/config.js</code> with <code>APP_ENV=local</code> for local bookmarklet testing (see README).</li>
                 </ul>
               </article>
               <article class="setup-card">

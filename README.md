@@ -2,7 +2,7 @@
 
 > Crawl a site, test internal navigation, and review redirects, parameter handling, soft failures, and URL-pattern issues in one place.
 
-![Cat Crawler screenshot](docs/screenshot.png)
+![Cat Crawler screenshot](docs/assets/screenshots/01-dashboard.png)
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Node](https://img.shields.io/badge/node-22.x-brightgreen)
@@ -55,13 +55,15 @@ Public docs and installer:
 
 The bookmarklet lives in [`docs/bookmarklet.js`](docs/bookmarklet.js).
 
-Its current behaviour is:
-- inject a floating launcher and panel into the current page
-- open the Cat Crawler app in an iframe
-- pass the current page URL as the `url` query parameter
-- run the app in bookmarklet mode so the UI uses the bookmarklet shell
+Its behaviour is:
+- open the **full Cat Crawler panel immediately** (a title bar, **Hide** to collapse to a small control, **Show** to restore)
+- load the deployed app in an **iframe** inside that panel (Express static build ships **no** `X-Frame-Options`; third-party `frame-ancestors` on your host is outside this repo)
+- pass the current page URL as the `url` query parameter (`?mode=bookmarklet&url=...`)
+- show a **loading** state while the iframe loads and an **in-panel error** if it times out
+- **reuse one instance**: running the bookmarklet again focuses the same root; if you navigate and run it again, the iframe reloads with the new page URL
+- **Close** tears the UI down completely
 
-The bookmarklet requires a valid app origin. The public docs site builds the bookmarklet install link from [`docs/config.js`](docs/config.js) and [`docs/install.js`](docs/install.js). For local development the tracked config points at `http://localhost:8080`. For staging or production releases, regenerate that config before publishing the docs.
+The public docs site builds the install link from [`docs/config.js`](docs/config.js) and [`docs/install.js`](docs/install.js). The **committed** `docs/config.js` targets production (`https://carla-site-crawler.fly.dev` by default—change it to your real deploy). For local testing only, run `APP_ENV=local node scripts/write-public-config.mjs` (never commit that output). `scripts/validate-committed-docs-config.mjs` rejects loopback or non-HTTPS origins in the tracked file.
 
 ## Current Architecture And Run Model
 
@@ -112,7 +114,7 @@ Important operational constraints:
 1. Open the public docs site: [https://carlashub.github.io/site-crawler/](https://carlashub.github.io/site-crawler/)
 2. Drag the bookmarklet button to your bookmarks bar.
 3. Open the page you want to seed from.
-4. Click the bookmarklet to open Cat Crawler in a floating panel.
+4. Click the bookmarklet to open the full panel with Cat Crawler loaded for the current tab’s URL.
 
 ## Main Options Explained Simply
 
@@ -223,8 +225,26 @@ For staging or production:
 Example docs config generation:
 
 ```bash
-APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://crawler.example.com node scripts/write-public-config.mjs
+APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://carla-site-crawler.fly.dev node scripts/write-public-config.mjs
 ```
+
+### Fly.io
+
+[`fly.toml`](fly.toml) defines app name `carla-site-crawler` (URL `https://carla-site-crawler.fly.dev` when that name is available). Deploy with the Fly CLI: `fly launch` once, then `fly deploy`. Set production secrets (for example `JOB_STATE_BACKEND=firestore`) per your environment.
+
+### Doc screenshots (Playwright)
+
+From the repo root, with the app reachable at `BASE_URL` and Playwright installed under `frontend/`:
+
+```bash
+cd frontend && npm ci && npx playwright install chromium
+# optional if browsers land in a custom dir:
+export PLAYWRIGHT_BROWSERS_PATH="$PWD/../.playwright-browsers"
+cd ..
+BASE_URL=http://127.0.0.1:8080 node scripts/capture-docs-screenshots.mjs
+```
+
+PNG outputs are written to `docs/assets/screenshots/`. The same script is wired as `capture-docs-screenshots` in [`scripts/package.json`](scripts/package.json).
 
 ### CI And Docs Publish Path
 

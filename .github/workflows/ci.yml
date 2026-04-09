@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Validate committed public docs config (before local overrides)
+        run: node scripts/validate-committed-docs-config.mjs
+
+      - name: Check docs and release helper syntax
+        run: |
+          node --check docs/bookmarklet.js
+          node --check docs/config.js
+          node --check docs/install.js
+          node --check scripts/write-public-config.mjs
+          node --check scripts/validate-public-docs.mjs
+          node --check scripts/validate-committed-docs-config.mjs
+          node --check scripts/lib/public-origin.mjs
+
+      - name: Verify docs screenshot script syntax
+        run: node --check scripts/capture-docs-screenshots.mjs
+
+      - name: Validate local docs/bookmarklet config
+        run: |
+          APP_ENV=local node scripts/write-public-config.mjs
+          APP_ENV=local node scripts/validate-public-docs.mjs
+
+      - name: Validate staging docs/bookmarklet config
+        run: |
+          APP_ENV=staging BOOKMARKLET_APP_ORIGIN=https://staging.example.com node scripts/write-public-config.mjs
+          APP_ENV=staging BOOKMARKLET_APP_ORIGIN=https://staging.example.com node scripts/validate-public-docs.mjs
+
+      - name: Validate production docs/bookmarklet config
+        run: |
+          APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://crawler.example.com node scripts/write-public-config.mjs
+          APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://crawler.example.com node scripts/validate-public-docs.mjs
+
+      - name: Lint backend
+        working-directory: backend
+        run: npm run lint
+
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build production Docker image
+        run: docker build --tag site-crawler-ci:${{ github.sha }} .
+
+      - name: Smoke test production Docker image
+        run: |
+          set -euo pipefail
+
+          image="site-crawler-ci:${{ github.sha }}"
+          container="site-crawler-ci"
+
+          cleanup() {
+            docker rm -f "$container" >/dev/null 2>&1 || true
+          }
+
+          trap cleanup EXIT
+
+          docker run -d --name "$container" -p 127.0.0.1:8080:8080 "$image"
+
+          for attempt in $(seq 1 30); do
+            if curl --silent --show-error --fail http://127.0.0.1:8080/healthz >/tmp/site-crawler-healthz.json; then
+              cat /tmp/site-crawler-healthz.json
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          docker logs "$container"
+          exit 1

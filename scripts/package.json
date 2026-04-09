@@ -1,0 +1,8 @@
+{
+  "name": "cat-crawler-doc-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture-docs-screenshots": "node capture-docs-screenshots.mjs"
+  }
+}

@@ -4,6 +4,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
+import { assertAllowedLocalDocsOrigin, assertAllowedPublicAppOrigin } from "./lib/public-origin.mjs";
 import { defaultOutputPath, resolvePublicConfig } from "./write-public-config.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -87,6 +88,12 @@ function validateBookmarkletHref(href, expectedOrigin, pageUrl) {
 
 function main() {
   const expectedConfig = resolvePublicConfig();
+  if (expectedConfig.environment === "local") {
+    assertAllowedLocalDocsOrigin(expectedConfig.appOrigin);
+  } else {
+    assertAllowedPublicAppOrigin(expectedConfig.appOrigin);
+  }
+
   const currentConfig = loadPublicConfig(defaultOutputPath);
 
   assert.deepEqual(currentConfig, expectedConfig, "docs/config.js does not match the resolved public config for this environment");
