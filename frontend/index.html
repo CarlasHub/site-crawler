@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Site Crawler</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <!-- Bookmarklet: hide legacy “Access control” panel even if an older JS bundle is cached -->
+    <style>
+      #root .shell--bookmarklet #access,
+      #root .shell--bookmarklet section[aria-labelledby="accessTitle"],
+      #root .shell--bookmarklet a.navPill[href="#access"] {
+        display: none !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

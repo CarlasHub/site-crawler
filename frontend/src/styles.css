@@ -1071,7 +1071,8 @@
 
   /* Pin / “Access control” panel must not appear in the bookmarklet iframe */
   .shell--bookmarklet #access,
-  .shell--bookmarklet section[aria-labelledby="accessTitle"] {
+  .shell--bookmarklet section[aria-labelledby="accessTitle"],
+  .shell--bookmarklet a.navPill[href="#access"] {
     display: none !important;
   }
 
