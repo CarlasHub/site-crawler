@@ -137,6 +137,31 @@ async function main() {
     await validation.first().screenshot({ path: path.join(outDir, "08-soft-failures.png") });
   }
 
+  const issueImpact = page.locator("details").filter({ has: page.getByText(/^Issue impact/) });
+  if ((await issueImpact.count()) > 0) {
+    await issueImpact.first().locator("summary").click();
+    await delay(200);
+    await issueImpact.first().screenshot({ path: path.join(outDir, "10-issue-impact.png") });
+  } else {
+    await validation.first().screenshot({ path: path.join(outDir, "10-issue-impact.png") });
+  }
+
+  const urlPatterns = page.locator("details").filter({ has: page.getByText(/^URL patterns/) });
+  if ((await urlPatterns.count()) > 0) {
+    await urlPatterns.first().locator("summary").click();
+    await delay(200);
+    await urlPatterns.first().screenshot({ path: path.join(outDir, "11-url-patterns.png") });
+  } else {
+    await validation.first().screenshot({ path: path.join(outDir, "11-url-patterns.png") });
+  }
+
+  await page.locator("#presets").scrollIntoViewIfNeeded();
+  await delay(400);
+  await page.locator("#presetName").fill("Example.com QA");
+  await page.getByRole("button", { name: /^Save preset$/ }).click();
+  await delay(200);
+  await page.locator("#presets").screenshot({ path: path.join(outDir, "12-presets.png") });
+
   await page.goto(bookmarkletUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForSelector(".shell--bookmarklet", { timeout: 30000 });
   await delay(300);

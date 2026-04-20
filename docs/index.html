@@ -884,6 +884,10 @@
         padding-bottom: 0;
       }
 
+      .showcase--loose {
+        margin-top: clamp(2.5rem, 6vw, 4rem);
+      }
+
       .showcase--flip {
         direction: rtl;
       }
@@ -1142,6 +1146,109 @@
         margin-top: 0.4rem;
       }
 
+      .arch-frame {
+        margin: 0 0 1.5rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.02);
+        padding: 1rem;
+      }
+
+      .arch-frame svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .checklist {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .checklist li {
+        display: grid;
+        grid-template-columns: 1.35rem minmax(0, 1fr);
+        gap: 0.7rem;
+        align-items: start;
+        font-size: 0.88rem;
+        line-height: 1.6;
+        color: var(--text-soft);
+      }
+
+      .checklist__box {
+        display: inline-grid;
+        place-items: center;
+        width: 1.35rem;
+        height: 1.35rem;
+        border-radius: 6px;
+        border: 1px solid var(--line-strong);
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--text-quiet);
+        background: rgba(255, 255, 255, 0.03);
+        margin-top: 0.05rem;
+      }
+
+      .roadmap-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1.1rem;
+      }
+
+      .roadmap-card {
+        padding: 1.5rem 1.35rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .roadmap-card h3 {
+        font-family: var(--font-display);
+        font-size: 1.02rem;
+        margin: 0 0 0.85rem;
+      }
+
+      .roadmap-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 0.7rem;
+      }
+
+      .roadmap-list li {
+        display: grid;
+        grid-template-columns: 1.35rem minmax(0, 1fr);
+        gap: 0.7rem;
+        align-items: start;
+        font-size: 0.88rem;
+        line-height: 1.6;
+        color: var(--text-soft);
+      }
+
+      .roadmap-box {
+        display: inline-grid;
+        place-items: center;
+        width: 1.35rem;
+        height: 1.35rem;
+        border-radius: 6px;
+        border: 1px solid var(--line-strong);
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--text-quiet);
+        background: rgba(255, 255, 255, 0.03);
+        margin-top: 0.05rem;
+      }
+
+      .roadmap-box--done {
+        border-color: rgba(141, 170, 140, 0.38);
+        color: #c5d6c4;
+        background: rgba(141, 170, 140, 0.1);
+      }
+
       .footer {
         padding: 2.5rem 0 1.5rem;
         border-top: 1px solid var(--line);
@@ -1168,7 +1275,8 @@
         .persona-grid,
         .flow,
         .note-grid,
-        .setup-grid {
+        .setup-grid,
+        .roadmap-grid {
           grid-template-columns: 1fr;
         }
 
@@ -1227,6 +1335,8 @@
           <a href="#bookmarklet">Bookmarklet</a>
           <a href="#limits">Limits</a>
           <a href="#setup">Setup</a>
+          <a href="#internal">Internal tool</a>
+          <a href="#roadmap">Roadmap</a>
         </nav>
       </div>
     </header>
@@ -1260,7 +1370,7 @@
                 <p class="hero__bookmarklet-hint">Drag the button above to your bookmarks bar.</p>
               </div>
               <a class="btn btn--secondary" href="#features">Explore the product</a>
-              <a class="btn btn--ghost" href="https://github.com/CarlasHub/site-crawler/blob/main/README.md">README on GitHub</a>
+              <a class="btn btn--ghost" href="https://github.com/radancy-pe/site-crawler/blob/main/README.md">README on GitHub</a>
             </div>
             <p class="hero__note">
               Prefer a link?
@@ -1664,26 +1774,27 @@
 
             <article class="showcase showcase--flip">
               <div>
-                <p class="showcase__kicker">Patterns</p>
-                <h3 class="showcase__title">Soft failures, patterns, duplicates</h3>
+                <p class="showcase__kicker">Soft failures</p>
+                <h3 class="showcase__title">Catch pages that look broken even on 200 responses</h3>
                 <p class="showcase__body">
-                  Surfaces successful pages that still look broken, structural URL anomalies, and URL groups that may be duplicate
-                  content.
+                  Reviews successful pages for empty content, failed API calls, missing expected components, and error-text patterns
+                  that plain status-code checks miss.
                 </p>
                 <aside class="callout">
                   <strong>Why it matters</strong>
-                  High-friction problems often skip simple 404/500 checks—these views add review context.
+                  Some of the most expensive crawl findings are not hard failures. This view keeps them visible instead of burying
+                  them in raw output.
                 </aside>
                 <ul>
-                  <li>Soft failures: missing content, error text, failed API calls</li>
-                  <li>Patterns: inconsistent naming, legacy vs current paths</li>
-                  <li>Duplicates: query and language variants grouped for review</li>
+                  <li>Missing content and thin responses</li>
+                  <li>Failed fetch/XHR calls surfaced beside the page URL</li>
+                  <li>Error text patterns grouped into one review section</li>
                 </ul>
               </div>
-              <figure class="media-frame" id="doc-preview-patterns" aria-labelledby="ppt-patterns-title">
+              <figure class="media-frame" id="doc-preview-soft-failures" aria-labelledby="ppt-soft-failures-title">
                 <div class="media-frame__head">
-                  <h3 id="ppt-patterns-title">Soft failures, patterns, and duplicates</h3>
-                  <p class="media-frame__sub">Issue grouping</p>
+                  <h3 id="ppt-soft-failures-title">Soft failures</h3>
+                  <p class="media-frame__sub">Heuristic review inputs</p>
                 </div>
                 <div class="media-frame__viewport">
                   <div class="media-frame__chrome" aria-hidden="true">
@@ -1695,13 +1806,102 @@
                     src="./assets/screenshots/08-soft-failures.png"
                     width="1280"
                     height="860"
-                    alt="Cat Crawler soft failures or validation grouping in the results area"
+                    alt="Cat Crawler soft failures section in the results area"
                     loading="lazy"
                     decoding="async"
                   />
                 </div>
                 <figcaption class="media-frame__spec">
-                  <p>Soft failures when present; otherwise a validation summary may appear for thin crawls.</p>
+                  <p>Soft failures when present; otherwise the section shows that no review issues were detected for the crawl.</p>
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="showcase">
+              <div>
+                <p class="showcase__kicker">Prioritisation</p>
+                <h3 class="showcase__title">Issue impact keeps repeated and core-flow problems near the top</h3>
+                <p class="showcase__body">
+                  Converts broken or redirected findings into a prioritised list using occurrence count, referrer count, and core-flow
+                  signals.
+                </p>
+                <aside class="callout">
+                  <strong>Why it matters</strong>
+                  Not every crawl issue deserves the same attention. Impact scoring helps triage what to fix first.
+                </aside>
+                <ul>
+                  <li>High, medium, and low impact groupings</li>
+                  <li>Occurrence count and referrer count exposed directly</li>
+                  <li>Core-flow signal carried into the issue detail</li>
+                </ul>
+              </div>
+              <figure class="media-frame" id="doc-preview-impact" aria-labelledby="ppt-impact-title">
+                <div class="media-frame__head">
+                  <h3 id="ppt-impact-title">Issue impact</h3>
+                  <p class="media-frame__sub">Prioritised crawl findings</p>
+                </div>
+                <div class="media-frame__viewport">
+                  <div class="media-frame__chrome" aria-hidden="true">
+                    <span class="media-frame__dots"><span></span><span></span><span></span></span>
+                    <span class="media-frame__url">Cat Crawler · Issue impact</span>
+                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/10-issue-impact.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler issue impact section with prioritised findings"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <figcaption class="media-frame__spec">
+                  <p>Shown after the same demo crawl; when no high-impact issues exist the section still exposes the zero-state summary.</p>
+                </figcaption>
+              </figure>
+            </article>
+
+            <article class="showcase showcase--flip">
+              <div>
+                <p class="showcase__kicker">Structure</p>
+                <h3 class="showcase__title">URL patterns and duplicate candidates stay review-oriented</h3>
+                <p class="showcase__body">
+                  Groups duplicate-looking URL structures, legacy-vs-current paths, inconsistent naming, and duplicate-content
+                  candidates without pretending they are final verdicts.
+                </p>
+                <aside class="callout">
+                  <strong>Why it matters</strong>
+                  Structural URL issues can signal routing debt, migration leftovers, or SEO review work that would be hard to spot
+                  from row-by-row results.
+                </aside>
+                <ul>
+                  <li>Duplicate structural patterns grouped together</li>
+                  <li>Legacy/current path pairs surfaced for migration review</li>
+                  <li>Duplicate candidate groups remain explicitly heuristic</li>
+                </ul>
+              </div>
+              <figure class="media-frame" id="doc-preview-patterns" aria-labelledby="ppt-patterns-title">
+                <div class="media-frame__head">
+                  <h3 id="ppt-patterns-title">URL patterns</h3>
+                  <p class="media-frame__sub">Structure-focused review</p>
+                </div>
+                <div class="media-frame__viewport">
+                  <div class="media-frame__chrome" aria-hidden="true">
+                    <span class="media-frame__dots"><span></span><span></span><span></span></span>
+                    <span class="media-frame__url">Cat Crawler · URL patterns</span>
+                  </div>
+                  <img
+                    class="media-frame__shot"
+                    src="./assets/screenshots/11-url-patterns.png"
+                    width="1280"
+                    height="860"
+                    alt="Cat Crawler URL patterns section in the results area"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <figcaption class="media-frame__spec">
+                  <p>Duplicate content candidates live in the same results area just below this section and follow the same review-first framing.</p>
                 </figcaption>
               </figure>
             </article>
@@ -1732,12 +1932,20 @@
                     <p>Crawled navigation entries with source, referrer, final URL, and classification.</p>
                   </div>
                   <div class="report-tile">
+                    <strong>Issue impact</strong>
+                    <p>Prioritised issues by severity, repetition, and flow importance.</p>
+                  </div>
+                  <div class="report-tile">
                     <strong>Exports</strong>
                     <p>TXT or CSV from the rendered report for handoff.</p>
                   </div>
                   <div class="report-tile">
                     <strong>Duplicate candidates</strong>
                     <p>Grouped URL variants for review—not a final duplicate verdict.</p>
+                  </div>
+                  <div class="report-tile">
+                    <strong>Client presets</strong>
+                    <p>Save, export, import, and reload crawl settings for repeatable runs.</p>
                   </div>
                 </div>
                 <aside class="callout callout--spaced">
@@ -1777,6 +1985,51 @@
               </figure>
             </div>
           </article>
+
+          <article class="showcase showcase--flip showcase--loose">
+            <div>
+              <p class="showcase__kicker">Repeatable runs</p>
+              <h3 class="showcase__title">Client presets keep recurring crawls consistent</h3>
+              <p class="showcase__body">
+                Store crawl settings in the browser, export them as JSON, import them on another machine, and reload them before a
+                client check or regression run.
+              </p>
+              <aside class="callout">
+                <strong>Why it matters</strong>
+                Repeatability matters as much as detection. Presets remove manual re-entry of exclusions, path limits, and runtime
+                options.
+              </aside>
+              <ul>
+                <li>Save named crawl configurations</li>
+                <li>Export and import preset bundles as JSON</li>
+                <li>Reload settings without rebuilding the crawl form by hand</li>
+              </ul>
+            </div>
+            <figure class="media-frame" id="doc-preview-presets" aria-labelledby="ppt-presets-title">
+              <div class="media-frame__head">
+                <h3 id="ppt-presets-title">Client presets</h3>
+                <p class="media-frame__sub">Saved crawl settings</p>
+              </div>
+              <div class="media-frame__viewport">
+                <div class="media-frame__chrome" aria-hidden="true">
+                  <span class="media-frame__dots"><span></span><span></span><span></span></span>
+                  <span class="media-frame__url">Cat Crawler · Client presets</span>
+                </div>
+                <img
+                  class="media-frame__shot"
+                  src="./assets/screenshots/12-presets.png"
+                  width="1280"
+                  height="860"
+                  alt="Cat Crawler client presets section with saved preset controls"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+              <figcaption class="media-frame__spec">
+                <p>Presets are browser-stored client-side settings, not shared backend records.</p>
+              </figcaption>
+            </figure>
+          </article>
         </div>
       </section>
 
@@ -1814,7 +2067,7 @@
                 </ul>
                 <div class="hero__actions hero__actions--tight">
                   <button class="btn btn--primary" id="copyBookmarklet" type="button">Copy bookmarklet URL</button>
-                  <a class="btn btn--secondary" href="https://github.com/CarlasHub/site-crawler/blob/main/README.md#deployment-notes">Deployment notes</a>
+                  <a class="btn btn--secondary" href="https://github.com/radancy-pe/site-crawler/blob/main/README.md#deployment-notes">Deployment notes</a>
                 </div>
                 <p class="config-note">
                   Current docs config:
@@ -1917,26 +2170,176 @@
             </header>
             <div class="setup-grid">
               <article class="setup-card">
-                <h3>Local setup</h3>
+                <h3>Run locally</h3>
+                <div class="arch-frame" aria-hidden="true">
+                  <svg viewBox="0 0 860 260" role="img">
+                    <rect x="20" y="40" width="170" height="74" rx="16" fill="#1e1e1c" stroke="rgba(255,255,255,0.16)" />
+                    <text x="105" y="72" fill="#f4f3f1" font-size="20" text-anchor="middle" font-family="DM Sans, sans-serif">Browser</text>
+                    <text x="105" y="96" fill="#b9b7b2" font-size="13" text-anchor="middle" font-family="DM Sans, sans-serif">localhost:8080</text>
+
+                    <rect x="248" y="20" width="170" height="74" rx="16" fill="#1e1e1c" stroke="rgba(255,255,255,0.16)" />
+                    <text x="333" y="52" fill="#f4f3f1" font-size="20" text-anchor="middle" font-family="DM Sans, sans-serif">Frontend</text>
+                    <text x="333" y="76" fill="#b9b7b2" font-size="13" text-anchor="middle" font-family="DM Sans, sans-serif">Vite build served by Express</text>
+
+                    <rect x="248" y="146" width="170" height="74" rx="16" fill="#1e1e1c" stroke="rgba(255,255,255,0.16)" />
+                    <text x="333" y="178" fill="#f4f3f1" font-size="20" text-anchor="middle" font-family="DM Sans, sans-serif">Backend</text>
+                    <text x="333" y="202" fill="#b9b7b2" font-size="13" text-anchor="middle" font-family="DM Sans, sans-serif">Express API + crawler</text>
+
+                    <rect x="476" y="83" width="170" height="74" rx="16" fill="#1e1e1c" stroke="rgba(255,255,255,0.16)" />
+                    <text x="561" y="115" fill="#f4f3f1" font-size="20" text-anchor="middle" font-family="DM Sans, sans-serif">Job state</text>
+                    <text x="561" y="139" fill="#b9b7b2" font-size="13" text-anchor="middle" font-family="DM Sans, sans-serif">file locally, Firestore in prod</text>
+
+                    <rect x="704" y="83" width="136" height="74" rx="16" fill="#1e1e1c" stroke="rgba(255,255,255,0.16)" />
+                    <text x="772" y="115" fill="#f4f3f1" font-size="20" text-anchor="middle" font-family="DM Sans, sans-serif">Target site</text>
+                    <text x="772" y="139" fill="#b9b7b2" font-size="13" text-anchor="middle" font-family="DM Sans, sans-serif">public same-host crawl</text>
+
+                    <path d="M190 77 H248" stroke="#9eb8d4" stroke-width="3" fill="none" />
+                    <path d="M333 94 V146" stroke="#9eb8d4" stroke-width="3" fill="none" />
+                    <path d="M418 183 C445 183 448 150 476 120" stroke="#9eb8d4" stroke-width="3" fill="none" />
+                    <path d="M646 120 H704" stroke="#9eb8d4" stroke-width="3" fill="none" />
+                  </svg>
+                </div>
                 <ul>
+                  <li>Use Node.js <code>22.x</code>.</li>
                   <li>Run <code>npm ci</code> in <code>frontend/</code> and <code>backend/</code>.</li>
                   <li>Build the frontend with <code>npm run build</code> in <code>frontend/</code>.</li>
                   <li>Start the backend with <code>npm start</code> in <code>backend/</code>.</li>
-                  <li>Regenerate <code>docs/config.js</code> with <code>APP_ENV=local</code> for local bookmarklet testing (see README).</li>
+                  <li>Open <code>http://localhost:8080</code> and confirm <code>/healthz</code> responds.</li>
+                  <li>Use <code>APP_ENV=local</code> if you regenerate <code>docs/config.js</code> for local bookmarklet testing.</li>
+                </ul>
+                <pre class="snippet">cd frontend
+npm ci
+npm run build
+
+cd ../backend
+npm ci
+npm start</pre>
+              </article>
+              <article class="setup-card">
+                <h3>Deploy professionally</h3>
+                <ul>
+                  <li>Build the production container from the repository <code>Dockerfile</code>.</li>
+                  <li>Deploy the container to a host such as Cloud Run, Fly.io, AWS App Runner, or ECS Fargate.</li>
+                  <li>Use <code>JOB_STATE_BACKEND=firestore</code> in staging and production.</li>
+                  <li>Publish the app on HTTPS and set <code>BOOKMARKLET_APP_ORIGIN</code> to that final app URL when generating docs.</li>
+                  <li>Validate the installer wiring before releasing the public docs.</li>
+                </ul>
+                <pre class="snippet">docker build -t cat-crawler .
+
+APP_ENV=production \
+BOOKMARKLET_APP_ORIGIN=https://your-app.example.com \
+node scripts/write-public-config.mjs
+
+APP_ENV=production \
+BOOKMARKLET_APP_ORIGIN=https://your-app.example.com \
+node scripts/validate-public-docs.mjs</pre>
+                <ul class="checklist" aria-label="Deployment checklist">
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Container image built and published</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span><code>APP_ENV</code>, <code>TRUST_PROXY</code>, and Firestore settings configured</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>HTTPS app URL confirmed and used for <code>BOOKMARKLET_APP_ORIGIN</code></span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span><code>/healthz</code> checked after deploy</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>GitHub Pages docs re-published after config refresh</span></li>
+                </ul>
+                <div class="hero__actions">
+                  <a class="btn btn--secondary" href="https://github.com/radancy-pe/site-crawler/blob/main/README.md">Open README</a>
+                  <a class="btn btn--secondary" href="https://github.com/radancy-pe/site-crawler">View repository</a>
+                </div>
+              </article>
+              <article class="setup-card">
+                <h3>Share internally</h3>
+                <p>
+                  This is the short version. Use the full internal rollout checklist below before giving the tool to a wider team.
+                </p>
+                <ul class="checklist" aria-label="Internal tool rollout checklist">
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Deploy on a company-controlled HTTPS domain.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Name an owner for uptime, secrets, and internal support.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Store Firestore credentials and runtime secrets in managed secret storage.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Decide whether access is open internally, VPN-only, or SSO-protected.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Document which company teams and target domains are approved for crawling.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Tell users that soft-failure, pattern, impact, and duplicate-candidate outputs are review aids, not final verdicts.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Rebuild and republish the docs after updating <code>BOOKMARKLET_APP_ORIGIN</code> to the real internal app URL.</span></li>
+                </ul>
+                <p><a class="link" href="#internal">Open the full internal rollout requirements</a></p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="internal" class="section" aria-labelledby="internal-heading">
+          <div class="shell">
+            <header class="section__intro">
+              <p class="kicker">Internal tool</p>
+              <h2 id="internal-heading" class="section__title">Minimum requirements before sharing this across the company</h2>
+              <p class="section__lede">
+                Cat Crawler is useful as an internal tool only if ownership, access, and user expectations are explicit. This is
+                the minimum bar for a professional rollout.
+              </p>
+            </header>
+            <div class="setup-grid">
+              <article class="setup-card">
+                <h3>Ownership and access</h3>
+                <ul class="checklist" aria-label="Ownership and access checklist">
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Deploy on a company-controlled HTTPS domain.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Name a service owner for uptime, secrets, access reviews, and incident response.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Decide whether access is open internally, VPN-only, SSO-protected, or limited to a smaller group.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Document who can deploy, rotate secrets, and change production configuration.</span></li>
                 </ul>
               </article>
               <article class="setup-card">
-                <h3>Publish path</h3>
-                <ul>
-                  <li>Generate <code>docs/config.js</code> with <code>APP_ENV</code> and <code>BOOKMARKLET_APP_ORIGIN</code>.</li>
-                  <li>Validate the installer with <code>scripts/validate-public-docs.mjs</code>.</li>
-                  <li>Keep <code>docs/index.html</code> and <code>docs/landing.html</code> aligned.</li>
-                  <li>Use the README for the full deployment and Docker notes.</li>
+                <h3>Security and usage policy</h3>
+                <ul class="checklist" aria-label="Security and usage policy checklist">
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Store Firestore credentials and runtime secrets in managed secret storage.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Confirm which company teams and which target domains are approved for crawling.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Tell users the tool only crawls public <code>http(s)</code> targets and stays on the same host as the start URL.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Tell users that soft-failure, pattern, impact, and duplicate-candidate outputs are review aids, not final verdicts.</span></li>
                 </ul>
-                <div class="hero__actions">
-                  <a class="btn btn--secondary" href="https://github.com/CarlasHub/site-crawler/blob/main/README.md">Open README</a>
-                  <a class="btn btn--secondary" href="https://github.com/CarlasHub/site-crawler">View repository</a>
-                </div>
+              </article>
+              <article class="setup-card">
+                <h3>Support and release discipline</h3>
+                <ul class="checklist" aria-label="Support and release discipline checklist">
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Write one short internal runbook for start URL choice, exclude rules, exports, and known limitations.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Name a support owner for bug reports, false positives, and release updates.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Rebuild and republish the docs after updating <code>BOOKMARKLET_APP_ORIGIN</code> to the real internal app URL.</span></li>
+                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Use a post-deploy check that confirms the live app URL, <code>/healthz</code>, and bookmarklet installer all point at the same release.</span></li>
+                </ul>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="roadmap" class="section" aria-labelledby="roadmap-heading">
+          <div class="shell">
+            <header class="section__intro">
+              <p class="kicker">Roadmap</p>
+              <h2 id="roadmap-heading" class="section__title">Team roadmap and release checklist</h2>
+              <p class="section__lede">
+                Completed items reflect the repository and docs as they stand today. Unchecked items are planned work for the team.
+              </p>
+            </header>
+            <div class="roadmap-grid">
+              <article class="roadmap-card">
+                <h3>Current baseline</h3>
+                <ul class="roadmap-list">
+                  <li><span class="roadmap-box roadmap-box--done" aria-hidden="true">✓</span><span>GitHub Pages docs and README now describe the same current feature set.</span></li>
+                  <li><span class="roadmap-box roadmap-box--done" aria-hidden="true">✓</span><span>Public screenshots cover the current dashboard, reports, impact view, URL patterns, bookmarklet mode, and presets.</span></li>
+                  <li><span class="roadmap-box roadmap-box--done" aria-hidden="true">✓</span><span>Bookmarklet docs are aligned with the committed production <code>appOrigin</code> in <code>docs/config.js</code>.</span></li>
+                </ul>
+              </article>
+              <article class="roadmap-card">
+                <h3>Near-term delivery</h3>
+                <ul class="roadmap-list">
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Push the cleaned repository to <code>radancy-pe/site-crawler</code> and confirm GitHub Pages is publishing from the intended repository.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Write one team-owned release checklist covering app deploy, docs publish, and <code>docs/config.js</code> refresh.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Review staging and production secret ownership for Firestore credentials, app origin, and deployment access.</span></li>
+                </ul>
+              </article>
+              <article class="roadmap-card">
+                <h3>Next product decisions</h3>
+                <ul class="roadmap-list">
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Decide whether production job state remains on Firestore or moves to an AWS-native backend before an AWS migration.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add a repeatable docs-refresh routine so screenshots and public copy stay current as the UI changes.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Define a team triage process for soft-failure, impact, and duplicate-candidate findings so heuristics stay reviewed and useful.</span></li>
+                </ul>
               </article>
             </div>
           </div>
@@ -1946,9 +2349,9 @@
       <footer class="footer">
         <div>
           <strong>Cat Crawler</strong>
-          <span>Documentation, bookmarklet installer, and public product overview.</span>
+          <span>Documentation, bookmarklet installer, team roadmap, and public product overview.</span>
         </div>
-        <div>Copyright <span id="year"></span> Carla Goncalves.</div>
+        <div>Project documentation for the current team release · <span id="year"></span></div>
       </footer>
     </main>
 
