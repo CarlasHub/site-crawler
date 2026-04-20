@@ -1335,7 +1335,6 @@
           <a href="#bookmarklet">Bookmarklet</a>
           <a href="#limits">Limits</a>
           <a href="#setup">Setup</a>
-          <a href="#internal">Internal tool</a>
           <a href="#roadmap">Roadmap</a>
         </nav>
       </div>
@@ -2143,7 +2142,6 @@
                   <li>Local development defaults to file-backed job state.</li>
                   <li>Staging and production must use <code>JOB_STATE_BACKEND=firestore</code>.</li>
                   <li>Production instances must share the same Firestore backend and collection prefix.</li>
-                  <li>Repo Fly config caps running machines at <code>2</code> when Fly.io is used.</li>
                   <li>The bookmarklet must point at a real deployed app origin.</li>
                 </ul>
               </article>
@@ -2219,7 +2217,7 @@ npm start</pre>
                 <h3>Deploy professionally</h3>
                 <ul>
                   <li>Build the production container from the repository <code>Dockerfile</code>.</li>
-                  <li>Deploy the container to a host such as Cloud Run, Fly.io, AWS App Runner, or ECS Fargate.</li>
+                  <li>Deploy the container to a container host that runs the repository <code>Dockerfile</code>.</li>
                   <li>Use <code>JOB_STATE_BACKEND=firestore</code> in staging and production.</li>
                   <li>Publish the app on HTTPS and set <code>BOOKMARKLET_APP_ORIGIN</code> to that final app URL when generating docs.</li>
                   <li>Validate the installer wiring before releasing the public docs.</li>
@@ -2245,64 +2243,6 @@ node scripts/validate-public-docs.mjs</pre>
                   <a class="btn btn--secondary" href="https://github.com/radancy-pe/site-crawler">View repository</a>
                 </div>
               </article>
-              <article class="setup-card">
-                <h3>Share internally</h3>
-                <p>
-                  This is the short version. Use the full internal rollout checklist below before giving the tool to a wider team.
-                </p>
-                <ul class="checklist" aria-label="Internal tool rollout checklist">
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Deploy on a company-controlled HTTPS domain.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Name an owner for uptime, secrets, and internal support.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Store Firestore credentials and runtime secrets in managed secret storage.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Decide whether access is open internally, VPN-only, or SSO-protected.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Document which company teams and target domains are approved for crawling.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Tell users that soft-failure, pattern, impact, and duplicate-candidate outputs are review aids, not final verdicts.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Rebuild and republish the docs after updating <code>BOOKMARKLET_APP_ORIGIN</code> to the real internal app URL.</span></li>
-                </ul>
-                <p><a class="link" href="#internal">Open the full internal rollout requirements</a></p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section id="internal" class="section" aria-labelledby="internal-heading">
-          <div class="shell">
-            <header class="section__intro">
-              <p class="kicker">Internal tool</p>
-              <h2 id="internal-heading" class="section__title">Minimum requirements before sharing this across the company</h2>
-              <p class="section__lede">
-                Cat Crawler is useful as an internal tool only if ownership, access, and user expectations are explicit. This is
-                the minimum bar for a professional rollout.
-              </p>
-            </header>
-            <div class="setup-grid">
-              <article class="setup-card">
-                <h3>Ownership and access</h3>
-                <ul class="checklist" aria-label="Ownership and access checklist">
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Deploy on a company-controlled HTTPS domain.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Name a service owner for uptime, secrets, access reviews, and incident response.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Decide whether access is open internally, VPN-only, SSO-protected, or limited to a smaller group.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Document who can deploy, rotate secrets, and change production configuration.</span></li>
-                </ul>
-              </article>
-              <article class="setup-card">
-                <h3>Security and usage policy</h3>
-                <ul class="checklist" aria-label="Security and usage policy checklist">
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Store Firestore credentials and runtime secrets in managed secret storage.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Confirm which company teams and which target domains are approved for crawling.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Tell users the tool only crawls public <code>http(s)</code> targets and stays on the same host as the start URL.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Tell users that soft-failure, pattern, impact, and duplicate-candidate outputs are review aids, not final verdicts.</span></li>
-                </ul>
-              </article>
-              <article class="setup-card">
-                <h3>Support and release discipline</h3>
-                <ul class="checklist" aria-label="Support and release discipline checklist">
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Write one short internal runbook for start URL choice, exclude rules, exports, and known limitations.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Name a support owner for bug reports, false positives, and release updates.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Rebuild and republish the docs after updating <code>BOOKMARKLET_APP_ORIGIN</code> to the real internal app URL.</span></li>
-                  <li><span class="checklist__box" aria-hidden="true">□</span><span>Use a post-deploy check that confirms the live app URL, <code>/healthz</code>, and bookmarklet installer all point at the same release.</span></li>
-                </ul>
-              </article>
             </div>
           </div>
         </section>
@@ -2311,34 +2251,34 @@ node scripts/validate-public-docs.mjs</pre>
           <div class="shell">
             <header class="section__intro">
               <p class="kicker">Roadmap</p>
-              <h2 id="roadmap-heading" class="section__title">Team roadmap and release checklist</h2>
+              <h2 id="roadmap-heading" class="section__title">Level-up features on the roadmap</h2>
               <p class="section__lede">
-                Completed items reflect the repository and docs as they stand today. Unchecked items are planned work for the team.
+                This roadmap is product-facing. It focuses on stronger crawl features, faster review, and better report workflows.
               </p>
             </header>
             <div class="roadmap-grid">
               <article class="roadmap-card">
-                <h3>Current baseline</h3>
+                <h3>Smarter crawl control</h3>
                 <ul class="roadmap-list">
-                  <li><span class="roadmap-box roadmap-box--done" aria-hidden="true">✓</span><span>GitHub Pages docs and README now describe the same current feature set.</span></li>
-                  <li><span class="roadmap-box roadmap-box--done" aria-hidden="true">✓</span><span>Public screenshots cover the current dashboard, reports, impact view, URL patterns, bookmarklet mode, and presets.</span></li>
-                  <li><span class="roadmap-box roadmap-box--done" aria-hidden="true">✓</span><span>Bookmarklet docs are aligned with the committed production <code>appOrigin</code> in <code>docs/config.js</code>.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add saved crawl histories with one-click rerun from previous settings.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add advanced include and exclude rules with preview before a crawl starts.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add per-section crawl summaries so large sites are easier to scan.</span></li>
                 </ul>
               </article>
               <article class="roadmap-card">
-                <h3>Near-term delivery</h3>
+                <h3>Deeper issue analysis</h3>
                 <ul class="roadmap-list">
-                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Push the cleaned repository to <code>radancy-pe/site-crawler</code> and confirm GitHub Pages is publishing from the intended repository.</span></li>
-                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Write one team-owned release checklist covering app deploy, docs publish, and <code>docs/config.js</code> refresh.</span></li>
-                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Review staging and production secret ownership for Firestore credentials, app origin, and deployment access.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add clearer issue severity scoring with stronger explanations for why a finding matters.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add better deduplication across related URLs so repeated issues collapse into cleaner groups.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add richer page context for failures, including title, template clues, and stronger source grouping.</span></li>
                 </ul>
               </article>
               <article class="roadmap-card">
-                <h3>Next product decisions</h3>
+                <h3>Team workflow</h3>
                 <ul class="roadmap-list">
-                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Decide whether production job state remains on Firestore or moves to an AWS-native backend before an AWS migration.</span></li>
-                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add a repeatable docs-refresh routine so screenshots and public copy stay current as the UI changes.</span></li>
-                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Define a team triage process for soft-failure, impact, and duplicate-candidate findings so heuristics stay reviewed and useful.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add shareable report views for handoff without exporting raw files first.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add comparison mode between two crawls to spot regressions after a release.</span></li>
+                  <li><span class="roadmap-box" aria-hidden="true">□</span><span>Add stronger preset tooling for client packs, reusable defaults, and faster setup.</span></li>
                 </ul>
               </article>
             </div>
@@ -2349,7 +2289,7 @@ node scripts/validate-public-docs.mjs</pre>
       <footer class="footer">
         <div>
           <strong>Cat Crawler</strong>
-          <span>Documentation, bookmarklet installer, team roadmap, and public product overview.</span>
+          <span>Documentation, bookmarklet installer, product roadmap, and public product overview.</span>
         </div>
         <div>Project documentation for the current team release · <span id="year"></span></div>
       </footer>

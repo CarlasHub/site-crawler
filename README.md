@@ -64,7 +64,7 @@ Its behaviour is:
 - **reuse one instance**: running the bookmarklet again focuses the same root; if you navigate and run it again, the iframe reloads with the new page URL
 - **Close** tears the UI down completely
 
-The public docs site builds the install link from [`docs/config.js`](docs/config.js) and [`docs/install.js`](docs/install.js). The **committed** `docs/config.js` sets `appOrigin` to your production app (currently **Google Cloud Run**: `https://site-crawler-989268314020.europe-west2.run.app`). For local testing only, run `APP_ENV=local node scripts/write-public-config.mjs` (never commit that output). `scripts/validate-committed-docs-config.mjs` rejects loopback or non-HTTPS origins in the tracked file.
+The public docs site builds the install link from [`docs/config.js`](docs/config.js) and [`docs/install.js`](docs/install.js). The **committed** `docs/config.js` sets `appOrigin` to the current production app origin: `https://site-crawler-989268314020.europe-west2.run.app`. For local testing only, run `APP_ENV=local node scripts/write-public-config.mjs` (never commit that output). `scripts/validate-committed-docs-config.mjs` rejects loopback or non-HTTPS origins in the tracked file.
 
 ## Current Architecture And Run Model
 
@@ -267,7 +267,7 @@ The Docker build:
 
 ### Deploy To A Container Host
 
-This project is designed to run on a container host such as Cloud Run, Fly.io, AWS App Runner, or ECS Fargate.
+This project is designed to run on a container host that can run the repository `Dockerfile`.
 
 Required production contract:
 - expose the app on port `8080`
@@ -305,121 +305,22 @@ Example docs config generation:
 APP_ENV=production BOOKMARKLET_APP_ORIGIN=https://site-crawler-989268314020.europe-west2.run.app node scripts/write-public-config.mjs
 ```
 
-### AWS Note
+## Level-Up Roadmap
 
-AWS hosting is possible, but this repository does **not** currently remove the Firestore dependency in staging or production. If you deploy to AWS today, the app still needs Firestore unless the backend is changed.
+Smarter crawl control:
+- [ ] Add saved crawl histories with rerun from previous settings.
+- [ ] Add advanced include and exclude rules with testable pattern previews.
+- [ ] Add per-section crawl summaries so large sites are easier to review at a glance.
 
-Practical AWS targets:
-- AWS App Runner
-- ECS Fargate
+Deeper issue analysis:
+- [ ] Add clearer issue severity scoring with stronger explanations for why an item matters.
+- [ ] Add issue deduplication across related URLs so repeated findings are easier to triage.
+- [ ] Add richer page context for failures, including page title, template clues, and stronger source grouping.
 
-### Requirements To Share This As An Internal Tool
-
-Treat this as the minimum internal rollout standard, not an optional note.
-
-Access and ownership:
-- [ ] The app is deployed on a company-controlled HTTPS domain.
-- [ ] A named service owner is responsible for uptime, secrets, access reviews, and incident response.
-- [ ] Access is defined explicitly: open internally, VPN-only, SSO-protected, or restricted to a smaller group.
-- [ ] A support owner is named for bug reports, false positives, and release updates.
-
-Security and secrets:
-- [ ] Firestore credentials and runtime secrets are stored in managed secret storage, not in local files or committed env files.
-- [ ] The deployment path, secret store, and who can change production config are documented for the team.
-- [ ] `TRUST_PROXY`, Firestore collection settings, and `BOOKMARKLET_APP_ORIGIN` are set intentionally for the real environment.
-
-Usage policy and user guidance:
-- [ ] The team has confirmed which sites or domains employees are allowed to crawl.
-- [ ] The team has documented that the tool crawls public `http(s)` targets only and stays on the same host as the start URL.
-- [ ] The team has documented that soft-failure, pattern, impact, and duplicate-candidate results are review aids, not final verdicts.
-- [ ] Internal users have one short runbook covering start URL choice, exclude rules, exports, and expected limitations.
-
-Release discipline:
-- [ ] The bookmarklet `appOrigin` points at the real internal deployment URL and the GitHub Pages docs have been republished after that update.
-- [ ] A release process exists for updating the app, public docs, screenshots, and `docs/config.js` together.
-- [ ] The team has a post-deploy check that confirms the live app URL, `/healthz`, and bookmarklet installer all work against the same release.
-
-### Google Cloud Run (current production-style app)
-
-The live UI + API for Cat Crawler is deployed separately from GitHub Pages—for example on **[Cloud Run](https://cloud.google.com/run)**. The bookmarklet’s `appOrigin` must match that HTTPS origin (no trailing slash), e.g. `https://site-crawler-989268314020.europe-west2.run.app`.
-
-GitHub Pages only serves the static docs and bookmarklet loader; crawls still run against your Cloud Run service.
-
-### Fly.io (optional)
-
-[`fly.toml`](fly.toml) is only relevant if you choose to deploy with [Fly.io](https://fly.io/) instead of (or in addition to) Cloud Run. Ignore it if you use Cloud Run only.
-The project Fly config caps running machines at `2` via `max_machines_running = 2`.
-
-### Doc screenshots (Playwright)
-
-From the repo root, with the app reachable at `BASE_URL` and Playwright installed under `frontend/`:
-
-```bash
-cd frontend && npm ci && npx playwright install chromium
-# optional if browsers land in a custom dir:
-export PLAYWRIGHT_BROWSERS_PATH="$PWD/../.playwright-browsers"
-cd ..
-BASE_URL=http://127.0.0.1:8080 node scripts/capture-docs-screenshots.mjs
-```
-
-PNG outputs are written to `docs/assets/screenshots/`. The same script is wired as `capture-docs-screenshots` in [`scripts/package.json`](scripts/package.json).
-
-### CI And Docs Publish Path
-
-The current CI workflow:
-- syntax-checks docs and release helpers
-- validates local, staging, and production docs/bookmarklet config generation
-- runs backend lint and tests
-- runs frontend lint and tests
-- builds the production Docker image
-- smoke-tests `/healthz`
-
-GitHub Pages content is served from `docs/`. The release docs tooling expects:
-- `docs/config.js`
-- `docs/install.js`
-- `docs/bookmarklet.js`
-- `docs/index.html`
-- `docs/landing.html`
-
-## Quick API Reference
-
-Primary UI-facing endpoints:
-- `POST /api/crawl/start`
-- `GET /api/crawl/:jobId`
-
-Health endpoints:
-- `GET /healthz`
-- `GET /readyz`
-
-There is also a direct crawl endpoint:
-- `POST /api/crawl`
-
-Use the background-job endpoints for the normal UI flow.
-
-## Docs And Public Pages
-
-- Public docs site: [https://redesigned-chainsaw-5l7vjn3.pages.github.io/](https://redesigned-chainsaw-5l7vjn3.pages.github.io/)
-- Public landing page source: [`docs/index.html`](docs/index.html)
-- Alternate docs page source: [`docs/landing.html`](docs/landing.html)
-- Bookmarklet loader source: [`docs/bookmarklet.js`](docs/bookmarklet.js)
-- Repository: [https://github.com/radancy-pe/site-crawler](https://github.com/radancy-pe/site-crawler)
-
-## Team Roadmap
-
-Current baseline:
-- [x] README and GitHub Pages docs are aligned with the current feature set and deployment notes.
-- [x] Public screenshots cover the current dashboard, reports, issue impact, URL patterns, bookmarklet mode, and client presets.
-- [x] Bookmarklet docs are aligned with the committed production `appOrigin` in `docs/config.js`.
-
-Near-term delivery:
-- [ ] Push the cleaned repository to `radancy-pe/site-crawler` and confirm GitHub Pages is publishing from the intended repository.
-- [ ] Write one team-owned release checklist covering app deploy, docs publish, and `docs/config.js` refresh.
-- [ ] Review staging and production secret ownership for Firestore credentials, app origin, and deployment access.
-
-Next product decisions:
-- [ ] Decide whether production job state remains on Firestore or moves to an AWS-native backend before an AWS migration.
-- [ ] Add a repeatable docs-refresh routine so screenshots and public copy stay current as the UI changes.
-- [ ] Define a team triage process for soft-failure, impact, and duplicate-candidate findings so heuristics stay reviewed and useful.
+Team workflow improvements:
+- [ ] Add shareable report views for handoff without exporting raw files first.
+- [ ] Add comparison mode between two crawls to spot regressions after a release.
+- [ ] Add more preset tooling for client packs, reusable defaults, and faster setup.
 
 ## License
 
