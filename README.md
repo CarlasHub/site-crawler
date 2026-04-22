@@ -23,8 +23,8 @@ The main UI starts a background crawl job, polls for progress, and then renders 
 There is also an optional bookmarklet. The bookmarklet does not perform the crawl itself. It opens the deployed Cat Crawler app in a floating panel and passes the current page URL into the app as the starting URL.
 
 Public docs and installer:
-- GitHub Pages: [https://redesigned-chainsaw-5l7vjn3.pages.github.io/](https://redesigned-chainsaw-5l7vjn3.pages.github.io/)
-- Repository: [https://github.com/radancy-pe/site-crawler](https://github.com/radancy-pe/site-crawler)
+- GitHub Pages: [https://carlashub.github.io/site-crawler/](https://carlashub.github.io/site-crawler/)
+- Repository: [https://github.com/CarlasHub/site-crawler](https://github.com/CarlasHub/site-crawler)
 
 ## What It Is Good For
 
@@ -51,6 +51,12 @@ Public docs and installer:
 - TXT and CSV export from the rendered audit report
 - Preset save, export, and import in the browser
 - Optional bookmarklet runner for opening the app from the page you are already viewing
+
+## Product Video
+
+<video src="docs/assets/media/site-crawler-demo.webm" controls muted playsinline preload="metadata" poster="docs/assets/screenshots/01-dashboard.png" width="100%"></video>
+
+If GitHub does not render the video inline in your browser, open [the demo video directly](docs/assets/media/site-crawler-demo.webm).
 
 ## What The Bookmarklet Does
 
@@ -127,7 +133,7 @@ Important operational constraints:
 
 ### Use The Bookmarklet
 
-1. Open the public docs site: [https://redesigned-chainsaw-5l7vjn3.pages.github.io/](https://redesigned-chainsaw-5l7vjn3.pages.github.io/)
+1. Open the public docs site: [https://carlashub.github.io/site-crawler/](https://carlashub.github.io/site-crawler/)
 2. Drag the bookmarklet button to your bookmarks bar.
 3. Open the page you want to seed from.
 4. Click the bookmarklet to open the full panel with Cat Crawler loaded for the current tab’s URL.
