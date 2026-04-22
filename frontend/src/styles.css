@@ -163,19 +163,12 @@
        0 0 24px -4px var(--accent-glow);
    }
    
-   .brandName { 
-     font-weight: 700; 
-     font-size: 16px;
-     letter-spacing: -0.02em;
-     color: var(--text-high);
-   }
-   
-   .brandTag { 
-     color: var(--muted); 
-     font-size: 12px; 
-     font-weight: 500;
-     margin-top: 2px; 
-   }
+  .brandName { 
+    font-weight: 700; 
+    font-size: 16px;
+    letter-spacing: -0.02em;
+    color: var(--text-high);
+  }
    
    /* === NAVIGATION === */
    .nav {
@@ -375,6 +368,14 @@
   .orb {
     width: 200px;
     height: 200px;
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+
+  .orbSurface {
+    position: absolute;
+    inset: 0;
     border-radius: 999px;
     background:
       radial-gradient(60px 60px at 34% 35%, rgba(255,255,255,0.22), transparent 60%),
@@ -383,10 +384,6 @@
       linear-gradient(180deg, rgba(10,14,26,0.55), rgba(10,14,26,0.18));
     border: 1px solid rgba(255,255,255,0.16);
     box-shadow: 0 24px 80px rgba(0,0,0,0.45);
-    position: relative;
-    overflow: hidden;
-    display: grid;
-    place-items: center;
   }
   
   .orbInner {
@@ -421,7 +418,8 @@
     color: var(--text-mid);
   }
   
-   .heroOrb.isRunning .orb {
+   .heroOrb.isRunning .orbSurface,
+   .heroOrb.isRunning .orbInner {
      animation: orbSpin 2s linear infinite;
    }
    
@@ -1086,10 +1084,6 @@
 
   .shell--bookmarklet .headerInner {
     grid-template-columns: auto 1fr;
-  }
-
-  .shell--bookmarklet .brandTag {
-    max-width: 52ch;
   }
 
   /* === HOW TO STEPS === */

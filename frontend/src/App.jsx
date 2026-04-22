@@ -548,9 +548,6 @@ export default function App() {
   }, [data, pageUrls]);
 
   const brandName = isBookmarklet ? "Cat Crawler" : "Carla’s tools";
-  const brandTag = isBookmarklet
-    ? "Cat Crawler - Site Crawler for the page you are on."
-    : "Site Crawler - Discover internal URLs with exclusions, redirects, duplicates and presets.";
 
   return (
     <div className={`shell${isBookmarklet ? " shell--bookmarklet" : ""}`}>
@@ -569,7 +566,6 @@ export default function App() {
             />
             <div className="brandText">
               <div className="brandName">{brandName}</div>
-              <div className="brandTag">{brandTag}</div>
             </div>
           </div>
 
@@ -668,6 +664,7 @@ export default function App() {
               </div>
 
               <div className="orb" aria-hidden="true">
+                <div className="orbSurface" />
                 <div className="orbInner" />
                 <div className="orbLabel">
                   <strong>{progress}%</strong>
